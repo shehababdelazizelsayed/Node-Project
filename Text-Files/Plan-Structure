@@ -1,0 +1,4 @@
+document.querySelector('[data-ng-bind-html]').innerHTML = '<img src=x onerror=alert(5)>';
+
+
+in learning curve courses page
