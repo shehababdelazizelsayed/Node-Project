@@ -1,0 +1,18 @@
+The Bug report on 4/10 Fixed on 5/10 By Team1(Shehab-Nada)
+
+First bug referance (1001):
+In the review file:
+
+    CreatedAT: {
+        type: Date,
+        default: Date.now(),
+      },
+
+    impact:
+        If "default: Date.now" Each Review has its own correct timestamp
+
+        If "default: Date.now()" All Reviews will have the same timestamp
+
+Second Due referance (1002):
+
+    The Capitalization confilict resulted in not being able to create user
