@@ -21,7 +21,7 @@ const reviewSchema = new schema({
   },
   CreatedAT: {
     type: Date,
-    default: Date.now(),
+    default: Date.now,
   },
 });
 
