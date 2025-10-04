@@ -2,39 +2,39 @@ const mongoose = require("mongoose");
 const schema = mongoose.Schema;
 
 const bookSchema = new schema({
-  title: {
+  Title: {
     type: String,
     required: true,
   },
-  author: {
+  Author: {
     type: String,
     required: true,
   },
-  price: {
+  Price: {
     type: Number,
     required: true,
   },
-  description: {
+  Description: {
     type: String,
     required: true,
   },
-  stock: {
+  Stock: {
     type: Number,
 
     min: 0,
     default: 0,
   },
-  image: {
+  Image: {
     type: String,
   },
-  pdf: {
+  Pdf: {
     type: String,
   },
-  category: {
+  Category: {
     type: String,
     required: true,
   },
-  reviews: [
+  Reviews: [
     {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Review",
