@@ -1,0 +1,698 @@
+index ============>endpoint
+env ==============>Mongo_URL
+to run First run this Script 
+'npm install '
+'npm run dev'
+you should see Server is running on port 3000
+and Connected! <===== that mean you are connected to database MongoDB
+
+this will run server on port 3000 'http://localhost:3000/'
+
+=========================================================================
+Post>>http://localhost:3000/api/Users/Register << UserRegister
+req.body={
+Name:"",
+Email:"",
+Password:"",
+Role:""   Note: To Be more Secure we should removed that for test Only 
+}
+=========================================================================
+Post>>http://localhost:3000/api/  << UserLogin
+
+Req.body= 
+{"Email": "",
+"Password":""
+}
+=========================================================================
+put>>http://localhost:3000/api/Users/Profile  << UserUpdate
+
+Email = req.header("UserEmail");
+Password = req.header("UserPassword");
+
+
+req.body={
+	"Name":""
+	"NewEmail":""
+	"NewPassword":""
+}
+=========================================================================
+Note "You most be Admin"
+post>>http://localhost:3000/api/Books << AddBooks
+
+Email = req.header("UserEmail");
+Password = req.header("UserPassword");
+
+req.body={ "Title":"" required , 
+	"Author":"" required , 
+	"Price":"" required, 
+	"Description":"" required,
+	"Stock":"" min: 0, default: 0,
+	"Image":"",
+	"Category":"", 
+	"Pdf":"", 
+	"Reviews":""} 
+
+=========================================================================
+Note "You most be Admin"
+get>>>http://localhost:3000/api/Books << GetBooks
+
+Email = req.header("UserEmail");
+Password = req.header("UserPassword");
+=========================================================================
+Note "You most be Admin"
+put >>>http://localhost:3000/api/Books/:id <<"Id in URL Required" <<UpdateBooks
+Email = req.header("UserEmail");
+Password = req.header("UserPassword");
+=========================================================================
+Note "You most be Admin"
+Delete>>http://localhost:3000/api/Books/:id <<"Id in URL Required" <<DeleteBook
+=========================================================================
+
+Post>>http://localhost:3000/api/Cart <<AddToCart
+
+Email = req.header("UserEmail");
+Password = req.header("UserPassword");
+
+req.body={
+"BookId":"",
+"Qty":""
+}
+=========================================================================
+
+Get>>http://localhost:3000/api/Cart  <<GetCart 
+
+Email = req.header("UserEmail");
+Password = req.header("UserPassword");
+=========================================================================
+Delete>>http://localhost:3000/api/Cart/:id <<"Id in URL Required"<<RemoveFromCart 
+
+Email = req.header("UserEmail");
+Password = req.header("UserPassword");
+=========================================================================
+Post>>http://localhost:3000/api/Orders   <<CreateOrder
+Email = req.header("UserEmail");
+Password = req.header("UserPassword");
+
+req.body = {
+    "Books": [ <====Must be array 
+      { "BookId": "", "Quantity": },
+      { "BookId": "", "Quantity": }
+    ]
+  }
+=========================================================================
+get>>http://localhost:3000/api/Orders    <<GetOrders
+
+Email = req.header("UserEmail");
+Password = req.header("UserPassword");
+=========================================================================
+
+Post>>http://localhost:3000/api/Reviews      <<CreateReview
+Email = req.header("UserEmail");
+Password = req.header("UserPassword");
+
+req.body = { "BookId":"", 
+"Rating":""",
+"Review": "" 
+} 
+=========================================================================
+
+Get>>http://localhost:3000/api/Reviews/:id<<"Id in URL Required"	 <<GetBookReviews
+
+=========================================================================
+
+Put>>http://localhost:3000/api/Review/:id<<"Id in URL Required"	 <<EditReview
+req.body = {
+"Rating":""
+"Review":""
+}
+
+Delete>>http://localhost:3000/api/Review/:id<<"Id in URL Required"	 <<DeleteReview
+
+
+==================================================================================================================================================
+#Structure
+
+##Controller>User.Controller
+
+###functions 
+1.UserLogin
+Req.body= 
+{"Email": "",
+"Password":""
+}
+validation:
+1. check user input if(!Email||Password)
+
+Status(400) ({ message: "Email and Password are required" })
+
+2. check if user exist FindUser User.findOne({Email}) 
+
+Status: (401){ message: "Invalid email or password" }
+
+3 check password is correct if (FindUser.Password !== Password ) 
+
+Status: (401){ message: "Invalid email or password" }
+
+if something wrong status(500) ({ message: error.message });
+console.error("Name Function", error);
+=========================================================================
+res if Login Successful status(200)
+message: "Login successful",
+        FindUser,
+        
+=========================================================================
+
+2.UserRegister 
+req.body={
+Name:"",
+Email:"",
+Password:"",
+Role:""   Note: To Be more Secure we should removed that for test Only 
+}
+
+
+#validation:
+1. check user input if(!Email||Password || Name)
+
+Status(400) ({ message: "Name, Email and Password are required" })
+
+
+
+if something wrong status(500) ({ message: error.message });
+console.error("Name Function", error);
+
+========================================================================
+Note: if user didn't insert Role 
+Role will be  by Default "User"
+
+ 
+
+========================================================================
+res if UserRegiser successes  
+return res.status(201).json({
+      message: "User created",
+      user: { id: user._id, Name: user.Name, Email: user.Email , Role:User.Role},
+    });
+=========================================================================
+3.UserUpdate
+
+Email = req.header("UserEmail");
+Password = req.header("UserPassword");
+
+
+req.body={
+	"Name":""
+	"NewEmail":""
+	"NewPassword":""
+}
+#Validation 
+
+1. check user input if(!Email||Password)
+
+Status(400) ({ message: "Email and Password are required" })
+
+2. check if user exist FindUser User.findOne({Email}) 
+
+Status: (401){ message: "Invalid email or password" }
+
+3 check password is correct if (FindUser.Password !== Password ) 
+
+Status: (401){ message: "Invalid email or password" }
+
+4.if user not change password 
+status(401) ({ message: "Please Insert New Password " })
+
+5.if user not insert anything to body 
+status(400) ({ message: "No fields to update" });
+
+
+Note:if Verified work we can run this Validation
+// if(FindUser.IsVerified == false ){
+//   return res.status(401).json({ message: "You most Verified First" });
+ // }
+ 
+=========================================================================
+res if UserUpdate successes 
+res.status(200).json({
+message: "Profile updated", User: UpdatedUser 
+});
+
+
+==================================================================================================================================================
+
+#login.Helper ====> to check user is login so you can use in API (Review,Order,Cart)
+
+
+
+##CheckForUser
+
+Email = req.header("UserEmail");
+Password = req.header("UserPassword");
+
+in API 
+const CheckUser = await CheckForUser(req, res);
+    if (!CheckUser) return;
+
+
+#Validation
+
+1. if (!Email) { res.status(401).json({ message: "Email is required" }); return null; }
+ 
+2.if (!user) { res.status(401).json({ message: "Invalid Email" }); 
+return null; }
+
+3.if (Password != null && user.Password !== Password) {
+    res.status(401).json({ message: "Invalid password" });
+return null; }
+
+Note:if Verified work we can run this Validation
+
+  // if (user.IsVerified !== true) { res.status(401).json({ message: "You must verify first" }); return null; }
+  
+  
+==================================================================================================================================================
+#Controller>Books.Controller  this page For Admin only
+##Function
+
+ChackForAdmin
+
+Email = req.header("UserEmail") 
+Password = req.header("UserPassword")
+
+##Validation
+
+1.if user add Email
+
+res.status(401).json({ message: "Email is required" });
+
+
+2.check if Email Correct 
+
+res.status(401).json({ message: "Invalid Email" });
+
+
+3.check if Password Correct
+  res.status(401).json({ message: "Invalid password" });
+  
+4.check for Admin
+ res.status(403).json({ message: "Access Denied" });
+ 
+=========================================================================
+##AddBook 
+call function CheckForAdmin First 
+  CheckAdmin = await CheckForAdmin(req, res);
+    if (!CheckAdmin) return null;
+req.body={ "Title":"" required , 
+	"Author":"" required , 
+	"Price":"" required, 
+	"Description":"" required,
+	"Stock":"" min: 0, default: 0,
+	"Image":"",
+	"Category":"", 
+	"Pdf":"", 
+	"Reviews":""} 
+
+## Validation 
+1. Check for(!Title || !Author || !Price || !Description || !Category ) 
+ res.status(400).json({ message: "Title, Author, Price , Description , Category are required" })
+ 
+2.check for price not negative
+res.status(400).json({ message: "Price must be >= 0" });
+
+3.check for Stock not negative
+ 
+ res.status(400).json({ message: "Stock must be >= 0" });
+ 
+=========================================================================
+AddBook Created 
+
+res.status(201).json({ message: "Book created", Book: CreateBook});
+
+
+==================================================================================================================================================
+GetBooks Admin only 
+
+CheckAdmin = await CheckForAdmin(req, res);
+	if (!CheckAdmin) return null
+
+=========================================================================
+## UpdateBoook
+
+
+
+{ id } = req.params;====> from URL /:id
+    
+#Validation 
+1.check if body is empty
+(req.body == null)
+ res.status(400).json({ message: "No fields to update" });
+   
+2.check for book id
+if (!GetThisBook) 
+res.status(404).json({ message: "Book not found" });
+
+3.check for price
+(Update.Price != null) 
+res.status(400).json({ message: "Price must be >= 0" });
+
+=========================================================================
+UpdatedBook success
+
+res.status(200).json({ message: "Book updated", Book: updatedBook });
+
+=========================================================================
+
+DeleteBook
+
+{ id } = req.params;====> from URL /:id
+
+Validation
+
+check for id book 
+if (!Deleted) 
+res.status(404).json({ message: "Book not found" });
+
+=========================================================================
+DeleteBook  success
+
+res.status(200).json({ message: "Book deleted", Book: Deleted });
+
+==================================================================================================================================================
+Controller>Cart.Controller
+
+{ CheckForUser } = require("../Helpers/Login.Helper");==> you need this module to check for user First 
+
+Email = req.header("UserEmail") 
+Password = req.header("UserPassword")
+=========================================================================
+Function AddToCart
+
+req.body={
+"BookId":"",
+"Qty":""
+}
+
+Validation:
+
+1.Check for user ===> CheckUser = await CheckForUser(req, res);
+    if (!CheckUser) return;    
+
+
+2.check for BookId
+ if (!GetBook)
+res.status(404).json({ message: "Book not found" });
+
+
+3.if Qty is null or undefined will return QtyNum = 1 by Default
+if (Qty === undefined || Qty === null) {
+        QtyNum = 1;
+4. if stock < QtyNUm
+GetBook.Stock < QtyNum) 
+res.status(405).json({ message: "Out of Stock" });
+
+5.if SelectedCart not exist will Create New one 
+
+if (!SelectCart) {
+      SelectCart = await Cart.create({
+        User: CheckUser._id,
+        Items: [{ Book: GetBook._id, Quantity: QtyNum }],
+      });
+=========================================================================    
+Note : .populate this use if i have relationships between collections.
+i can get actual document data from the other collection.
+
+const Result = await Cart.findById(SelectCart._id)
+        .populate({ path: "Items.Book", select: "Title Stock Price Image Category" })
+=========================================================================
+AddTocart success
+res.status(201).json({ message: "Added to cart", Cart: Result });
+
+=========================================================================
+function GetCart
+Validation:
+
+1.Check for user ===> CheckUser = await CheckForUser(req, res);
+    if (!CheckUser) return; 
+    
+    
+ 2.check cart by User.Id 
+  if(!SelectCart)
+  res.status(404).json({ message: "Cart not Found" });
+  
+=========================================================================
+GetCart 
+res.status(200).json({message:"Cart is Found ", Cart:SelectCart})
+=========================================================================
+RemoveFromCart
+
+{ id: BookId } = req.params;====> from URL /:id
+
+Validation:
+
+1.Check for user ===> CheckUser = await CheckForUser(req, res);
+    if (!CheckUser) return;  
+2.check for cart  by user id 
+if (!SelectCart) 
+res.status(404).json({ message: "Cart not found" });
+
+3.check for book in array 
+ if (index === -1)res.status(404).json({ message: "Book not found in cart" });
+ 
+=========================================================================
+RemoveFromCart success
+res.status(500).json({ message: error.message });
+==================================================================================================================================================
+Controller>Review.Controller
+
+Function CreateReview
+
+{ "BookId":"", 
+"Rating":""",
+"Review": "" 
+} 
+Validation:
+
+1.Check for user ===> CheckUser = await CheckForUser(req, res);
+    if (!CheckUser) return;  
+2.if Book id 
+if (BookId === undefined || BookId === null) {
+       res.status(400).json({ message: "BookId is required" });
+       
+3.check for Rating is not empty 
+if (Rating === undefined || Rating === null) {
+      return res.status(400).json({ message: "Rating is required" });
+    }
+    
+    
+    
+4.check for Ratting is num and must be 1:10
+    if (!Number.isInteger(RatingNum) || RatingNum < 1 || RatingNum > 10) {
+       res.status(400).json({ message: "Rating must be an integer between 1 and 10" });
+    }
+  
+5.check if Review is not empty if empty will be will exit from if condition if not will check for number of characters
+
+ if (ReviewTextFromBody !== undefined && ReviewTextFromBody!== null) {
+  ReviewText = String(ReviewTextFromBody).trim();
+
+  if (ReviewText.length > 1000) {
+    return res.status(400).json({ message: "Review must be at most 1000 characters" });
+  }
+}
+
+6.check for book if exist
+ if (!foundBook) {
+      return res.status(404).json({ message: "Book not found" });
+    }
+ 7.every user can add one reviewed
+if (exists) {
+      return res.status(409).json({ message: "You have already reviewed this book" });
+    }
+    
+=========================================================================
+Review added successfully
+  return res.status(201).json({
+      message: "Review added successfully",
+      reviewId: created._id,
+      bookId: String(BookId),
+      rating: created.Rating
+    });
+=========================================================================
+
+function GetBookReviews
+{ BookId } = req.params;====> from URL /:id
+
+Validation:
+
+1.Check for user ===> CheckUser = await CheckForUser(req, res);
+    if (!CheckUser) return; 
+    
+2.Check for book id if exist
+ if (!BookId) {
+      return res.status(400).json({ message: "Book id is required" });
+    }
+
+=========================================================================
+reviews success
+
+res.status(200).json(reviews);
+=========================================================================
+function EditReview
+{ ReviewData } = req.params;====> from URL /:id
+
+{
+"Rating":""
+"Review":""
+}
+
+Validation:
+
+1.Check for user ===> CheckUser = await CheckForUser(req, res);
+    if (!CheckUser) return; 
+
+2.check for id review
+if (!CheckId) {
+      return res.status(404).json({ message: "Review not found" });
+    }
+3.check for user if he is same user is create this review
+ if (String(CheckId.User) !== String(CheckUser._id)) {
+      return res.status(403).json({ message: "Not allowed to update this review" });
+    }
+    
+4.check for Ratting is num and must be 1:10
+  if (HasRating) {
+      const RatingNum = Number(UpdateRating);
+      if (!Number.isInteger(RatingNum) || RatingNum < 1 || RatingNum > 10) {
+        return res.status(400).json({ message: "Rating must be an integer between 1 and 10" });
+      }
+      CheckId.Rating = RatingNum;
+    }
+    
+5.check for number of characters 
+ if (HasText) {
+      let ReviewText = String(UpdateReview).trim();
+      if (ReviewText.length > 1000) {
+        return res.status(400).json({ message: "Review must be at most 1000 characters" });
+      }
+      CheckId.Review = ReviewText;
+    }
+    
+========================================================================
+Review updated successfully
+res.status(200).json({
+      message: "Review updated successfully",
+      reviewId: CheckId._id,
+      rating: CheckId.Rating,
+      review: CheckId.Review
+    });
+    
+=======================================================================
+function DeleteReview
+
+{ ReviewData } = req.params;====> from URL /:id
+Validation:
+
+1.Check for user ===> CheckUser = await CheckForUser(req, res);
+    if (!CheckUser) return; 
+    
+2.check if id exist
+if (!ReviewData ) {
+      return res.status(400).json({ message: "Review id is required" });
+    }
+    
+3.check if Review exist
+if (!CheckId) {
+      return res.status(404).json({ message: "Review not found" });
+    }
+
+4.check for user if he is same user is create Review
+if (!CheckId) {
+      return res.status(404).json({ message: "Review not found" });
+    }
+5.Check for Review again
+if (!Deleted) {
+          return res.status(404).json({ message: "Review not found" });
+        }
+=========================================================================
+Review deleted successfully"
+res.status(200).json({ message: "Review deleted successfully" });
+
+==================================================================================================================================================
+Controllers>Orders.Controller
+Note: user can Add and View only 
+
+function CreateOrder
+
+req.body = {
+    "Books": [ <====Must be array 
+      { "BookId": "", "Quantity": },
+      { "BookId": "", "Quantity": }
+    ]
+  }
+Note :  this to check  cart 
+// const CheckCart = await Cart.findOne({ CheckUser: User._id });
+    // if (!CheckCart) {
+    //   return res.status(400).json({ message: "Cart is empty" });
+
+    // }
+Validation:
+
+1.Check for user ===> CheckUser = await CheckForUser(req, res);
+    if (!CheckUser) return; 
+    
+2.check if books is Array
+if (!body || !Array.isArray(body.Books) || body.Books.length === 0) {
+      return res.status(400).json({ message: "Books array is required" });
+    }
+3.Check for id exist
+ if (!item || !item.BookId ) {
+        return res.status(400).json({ message: "BookId is required at index " + i });
+      }
+
+4.check if book exist 
+ const book = await Book.findById(item.BookId);
+      if (!book) {
+        return res.status(404).json({ message: "Book not found " + i });
+      }
+
+5.check for stock 
+
+      if (book.Stock == null || book.Stock < item.Quantity) {
+        return res.status(400).json({ message: "Not enough stock" + i });
+      }
+========================================================================
+important Note
+
+1.decreases the book’s stock by the ordered quantity
+
+book.Stock = book.Stock - Number(item.Quantity);
+
+2.and update this in book database
+await book.save();
+
+3.Calculate price price * Qty 
+totalPrice = totalPrice + (Number(book.Price) * Number(item.Quantity));
+
+4.Status by Default panding 
+=========================================================================
+res.status(201).json({
+      message: "Order placed",
+      orderId: created._id,
+      total: created.TotalPrice
+    });
+    
+=========================================================================
+Function GetOrders
+
+
+Validation:
+
+Check for user ===> CheckUser = await CheckForUser(req, res);
+    if (!CheckUser) return; 
+    
+=========================================================================
+GetOrders
+res.status(200).json(UserOrders);
+=========================================================================
+
+
