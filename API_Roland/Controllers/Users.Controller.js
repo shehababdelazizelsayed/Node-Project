@@ -124,7 +124,9 @@ const UserUpdate = async function updateProfile(req, res) {
     const updates = {};
     if (req.body.Name != null) updates.Name = req.body.Name;
     if (req.body.NewEmail != null) updates.Email = req.body.NewEmail.toLowerCase().trim();
+    if (!req.body.NewEmail) updates.Email = FindUser.Email;
     if (req.body.NewPassword != null) updates.Password = req.body.NewPassword;
+    if (!req.body.NewPassword) updates.Password = FindUser.Password;
     if (req.body.NewPassword == FindUser.Password) {
       return res.status(401).json({
         message: "Please Insert New Password "
