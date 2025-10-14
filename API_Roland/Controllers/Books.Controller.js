@@ -1,14 +1,9 @@
 const Book = require("../models/Book");
 
-function isAdmin(req) {
-  return req.user && req.user.role === "Admin";
-}
 
+// Add
 async function AddBook(req, res) {
   try {
-    if (!isAdmin(req)) {
-      return res.status(403).json({ message: "Admin access required" });
-    }
 
     const {
       Title,
@@ -19,13 +14,16 @@ async function AddBook(req, res) {
       Image,
       Category,
       Pdf,
-      Reviews,
     } = req.body;
+
+
     if (!Title || !Author || !Price || !Description || !Category) {
       return res.status(400).json({
         message: "Title, Author, Price , Description , Category are required",
       });
     }
+
+
     if (Number(Price) < 0) {
       return res.status(400).json({ message: "Price must be >= 0" });
     }
@@ -33,6 +31,7 @@ async function AddBook(req, res) {
     if (Number(Stock) < 0) {
       return res.status(400).json({ message: "Stock must be >= 0" });
     }
+
 
     const CreateBook = await Book.create({
       Title,
@@ -43,20 +42,21 @@ async function AddBook(req, res) {
       Description,
       Image,
       Pdf,
-      Reviews,
+      Owner: req.user.userId
     });
-    return res.status(201).json({ message: "Book created", Book: CreateBook });
+
+    return res.status(201).json({ message: "Book created successfully", Book: CreateBook });
+
   } catch (error) {
     console.error("addBook:", error);
     return res.status(500).json({ message: error.message });
   }
-}
+};
 
+
+// Update
 async function UpdateBooks(req, res) {
   try {
-    if (!isAdmin(req)) {
-      return res.status(403).json({ message: "Admin access required" });
-    }
 
     const { id } = req.params;
     const GetThisBook = await Book.findById(id);
@@ -64,8 +64,13 @@ async function UpdateBooks(req, res) {
     if (req.body == null) {
       return res.status(400).json({ message: "No fields to update" });
     }
+
     if (!GetThisBook) {
       return res.status(404).json({ message: "Book not found" });
+    }
+
+    if (req.user.Role !== "Admin" && CreateBook.Owner.toString() !== req.user.userId) {
+      return res.status(403).json({ message: "You are not allowed to edit this book" });
     }
 
     const allowed = [
@@ -77,8 +82,8 @@ async function UpdateBooks(req, res) {
       "Description",
       "Image",
       "Pdf",
-      "Reviews",
     ];
+
     const Update = {};
     for (const key of allowed) {
       if (req.body[key] != null) Update[key] = req.body[key];
@@ -89,40 +94,51 @@ async function UpdateBooks(req, res) {
       if (Update.Price < 0)
         return res.status(400).json({ message: "Price must be >= 0" });
     }
+
     if (Update.Stock != null) {
       Update.Stock = Number(Update.Stock);
       if (Update.Stock < 0)
         return res.status(400).json({ message: "Stock must be >= 0" });
     }
+
     const updatedBook = await Book.findByIdAndUpdate(id, Update, {
       new: true,
     });
-    return res.status(200).json({ message: "Book updated", Book: updatedBook });
+
+    return res.status(200).json({ message: "Book updated successfully", Book: updatedBook });
+
   } catch (error) {
     console.error("UpdateBook", error);
     res.status(500).json({ message: error.message });
   }
 }
+
+
+// Delete
 async function DeleteBook(req, res) {
   try {
-    if (!isAdmin(req)) {
-      return res.status(403).json({ message: "Admin access required" });
-    }
 
     const { id } = req.params;
-
     const Deleted = await Book.findByIdAndDelete(id);
+
     if (!Deleted) {
       return res.status(404).json({ message: "Book not found" });
     }
 
-    return res.status(200).json({ message: "Book deleted", Book: Deleted });
+    if (req.user.Role !== "Admin" && CreateBook.Owner.toString() !== req.user.userId) {
+      return res.status(403).json({ message: "You are not allowed to delete this book" });
+    }
+
+    return res.status(200).json({ message: "Book deleted successfully", Book: Deleted });
+
   } catch (error) {
     console.error("DeleteBook:", error);
     res.status(500).json({ message: error.message });
   }
 }
 
+
+// Get
 async function GetBooks(res) {
   try {
     const books = await Book.find();

@@ -5,7 +5,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const {
   authMiddleware,
-  adminMiddleware,
+  authorizeRoles,
 } = require("./Helpers/auth.middleware");
 const {
   UserLogin,
@@ -53,9 +53,9 @@ app.post("/api/Users/Login", UserLogin);
 app.patch("/api/Users/Profile", authMiddleware, UserUpdate);
 
 app.get("/api/Books", GetBooks);
-app.post("/api/Books", authMiddleware, adminMiddleware, AddBook);
-app.put("/api/Books/:id", authMiddleware, adminMiddleware, UpdateBooks);
-app.delete("/api/Books/:id", authMiddleware, adminMiddleware, DeleteBook);
+app.post("/api/Books", authMiddleware, authorizeRoles("Owner", "Admin"), AddBook);
+app.put("/api/Books/:id", authMiddleware, authorizeRoles("Owner", "Admin"), UpdateBooks);
+app.delete("/api/Books/:id", authMiddleware, authorizeRoles("Owner", "Admin"), DeleteBook);
 
 app.post("/api/Cart", authMiddleware, AddToCart);
 app.get("/api/Cart", authMiddleware, GetCart);

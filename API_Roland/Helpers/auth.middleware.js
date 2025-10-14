@@ -17,15 +17,16 @@ const authMiddleware = async (req, res, next) => {
   }
 };
 
-const adminMiddleware = async (req, res, next) => {
-  try {
-    if (req.user.role !== "Admin") {
-      return res.status(403).json({ message: "Admin access required" });
+
+const authorizeRoles = (...roles) => {
+  return (req, res, next) => {
+    if (!roles.includes(req.user.Role)) {
+      return res.status(403).json({ message: "Access denied" });
     }
     next();
-  } catch (error) {
-    res.status(403).json({ message: "Access denied" });
-  }
+  };
 };
 
-module.exports = { authMiddleware, adminMiddleware };
+
+
+module.exports = { authMiddleware, authorizeRoles };

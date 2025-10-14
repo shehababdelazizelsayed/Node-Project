@@ -40,6 +40,11 @@ const bookSchema = new schema({
       ref: "Review",
     },
   ],
+  Owner: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+  }
 });
 
 module.exports = mongoose.model("Book", bookSchema);

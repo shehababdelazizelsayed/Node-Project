@@ -17,13 +17,17 @@ const userSchema = new schema({
   },
   Role: {
     type: String,
-    enum: ["User", "Admin"],
+    enum: ["User", "Admin", "Owner"],
     default: "User",
   },
   IsVerified: {
     type: Boolean,
     default: false,
   },
+  verificationToken: String,
+  verificationExpires: Data,
+  resetPasswordToken: String,
+  resetPasswordExpires: Date,
 });
 
 module.exports = mongoose.model("User", userSchema);
