@@ -1,168 +1,166 @@
-const User = require("../models/User")
-
-
-const UserLogin = async (req, res) => {
-  try {
-    const {
-      Email,
-      Password
-    } = req.body;
-
-    if (!Email || !Password) {
-      return res.status(400).json({
-        message: "Email and Password are required"
-      });
-    }
-
-    const FindUser = await User.findOne({
-      Email
-    });
-    if (!FindUser) {
-      return res.status(401).json({
-        message: "Invalid email or password"
-      });
-    }
-
-    if (FindUser.Password !== Password) {
-      return res.status(401).json({
-        message: "Invalid email or password"
-      });
-    }
-
-    return res.status(200).json({
-      message: "Login successful",
-      FindUser,
-      //   FindUser: {
-      //     id: user._id,
-      //     Name: user.Name,
-      //     Email: user.Email,
-      //     Role:User.Role,
-      //     IsVerified:User.IsVerified
-      //   },
-    });
-  } catch (error) {
-    console.error("Login error:", error);
-    return res.status(500).json({
-      message: error.message
-    });
-  }
-};
+const User = require("../models/User");
+const bcrypt = require("bcrypt");
+const { CheckForUser } = require("../Helpers/Login.Helper");
 
 const UserRegister = async (req, res) => {
   try {
-    const {
-      Name,
-      Email,
-      Password,
-      Role
-    } = req.body;
+    const { Name, Email, Password, Role } = req.body;
 
-    if (!Email || !Password || !Name) {
+    if (!Name || !Email || !Password) {
       return res.status(400).json({
-        message: "Name, Email and Password are required"
+        message: "Name, Email and Password are required",
       });
     }
 
-    const roleToSave = Role || "User";
+    const existingUser = await User.findOne({ Email });
+    if (existingUser) {
+      return res.status(400).json({
+        message: "Email already registered",
+      });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(Password, salt);
 
     const user = await User.create({
       Name,
       Email,
-      Password,
-      roleToSave
+      Password: hashedPassword,
+      Role: Role || "User",
     });
 
-
     return res.status(201).json({
-      message: "User created",
+      message: "Registration successful",
       user: {
         id: user._id,
         Name: user.Name,
         Email: user.Email,
-        Role: user.roleToSave
+        Role: user.Role,
       },
     });
   } catch (error) {
-    console.error("UserRegister:", error);
+    console.error("Registration error:", error);
     return res.status(500).json({
-      message: error.message
+      message: error.message,
     });
   }
 };
 
-const UserUpdate = async function updateProfile(req, res) {
+const UserLogin = async (req, res) => {
   try {
+    const result = await CheckForUser(req, res);
+    if (!result) return;
 
-    //  const { Email, Password } = req.body;
-    const Email = req.header("UserEmail");
-    const Password = req.header("UserPassword");
+    const { user, token } = result;
 
-    if (!Email || !Password) {
-      return res.status(400).json({
-        message: "Email and Password are required"
-      });
-    }
-
-    const FindUser = await User.findOne({
-      Email
+    return res.status(200).json({
+      message: "Login successful",
+      user: {
+        id: user._id,
+        Name: user.Name,
+        Email: user.Email,
+        Role: user.Role,
+        IsVerified: user.IsVerified,
+      },
+      token,
     });
-    if (!FindUser) {
-      return res.status(401).json({
-        message: "You most Login first "
-      });
-    }
+  } catch (error) {
+    console.error("Login error:", error);
+    return res.status(500).json({
+      message: error.message,
+    });
+  }
+};
 
-    if (FindUser.Password !== Password) {
+const UserUpdate = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const user = await User.findById(userId);
+
+    if (!user) {
       return res.status(401).json({
-        message: "Invalid  password"
+        message: "User not found",
       });
     }
-    // if(FindUser.IsVerified == false ){
-    //   return res.status(401).json({ message: "You most Verified First" });
-    // }
 
     const updates = {};
-    if (req.body.Name != null) updates.Name = req.body.Name;
-    if (req.body.NewEmail != null) updates.Email = req.body.NewEmail.toLowerCase().trim();
-    if (!req.body.NewEmail) updates.Email = FindUser.Email;
-    if (req.body.NewPassword != null) updates.Password = req.body.NewPassword;
-    if (!req.body.NewPassword) updates.Password = FindUser.Password;
-    if (req.body.NewPassword == FindUser.Password) {
-      return res.status(401).json({
-        message: "Please Insert New Password "
-      });
+
+    // Handle name update
+    if (req.body.Name) {
+      updates.Name = req.body.Name;
     }
 
-    if (req.body == null) {
-      return res.status(400).json({
-        message: "No fields to update"
+    if (req.body.Email) {
+      const emailExists = await User.findOne({
+        Email: req.body.Email.toLowerCase().trim(),
+        _id: { $ne: userId },
       });
+
+      if (emailExists) {
+        return res.status(400).json({
+          message: "Email already in use",
+        });
+      }
+      updates.Email = req.body.Email.toLowerCase().trim();
     }
 
-    const UpdatedUser = await User.findByIdAndUpdate(
-      FindUser._id, {
-        $set: updates
-      }, {
-        new: true,
-        runValidators: true
+    if (req.body.NewPassword) {
+      // Require current password for security
+      if (!req.body.CurrentPassword) {
+        return res.status(400).json({
+          message: "Current password is required to change password",
+        });
       }
 
-    )
-    return res.status(200).json({
-      message: "Profile updated",
-      User: UpdatedUser
-    });
+      // Verify current password
+      const isValidPassword = await bcrypt.compare(
+        req.body.CurrentPassword,
+        user.Password
+      );
+      if (!isValidPassword) {
+        return res.status(401).json({
+          message: "Current password is incorrect",
+        });
+      }
 
+      // Hash new password
+      const salt = await bcrypt.genSalt(10);
+      updates.Password = await bcrypt.hash(req.body.NewPassword, salt);
+    }
+
+    // Check if there are any updates
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({
+        message: "No fields to update",
+      });
+    }
+
+    // Update user
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $set: updates },
+      { new: true, runValidators: true }
+    );
+
+    return res.status(200).json({
+      message: "Profile updated successfully",
+      user: {
+        id: updatedUser._id,
+        Name: updatedUser.Name,
+        Email: updatedUser.Email,
+        Role: updatedUser.Role,
+      },
+    });
   } catch (error) {
     console.error("UserUpdate:", error);
     return res.status(500).json({
-      message: error.message
+      message: error.message,
     });
   }
-}
+};
 
 module.exports = {
   UserLogin,
   UserRegister,
-  UserUpdate
-}
+  UserUpdate,
+};
