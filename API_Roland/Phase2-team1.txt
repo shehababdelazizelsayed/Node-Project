@@ -237,3 +237,65 @@ router.get('/admin/users', authMiddleware, adminMiddleware, AdminUserList);
    - Implement request validation
    - Add SSL/TLS in production
    - Regular security audits
+
+---------------------------------------------------------
+
+Second part:
+
+
+Send verification email (OTP or token)
+
+Verify email → activate account
+
+password reset
+
+Role-based authorization
+---------------------------------------------
+
+ curl -X POST http://localhost:3000/api/Users/Register \
+  "Name": "Shehab",
+  "Email": "shehab200088111@gm> -H "Content-Type: application/json" \
+> -d '{
+>   "Name": "Shehab",
+>   "Email": "shehab200088111@gmail.com",
+>   "Password": "Test123!@#"
+> }'
+curl: (7) Failed to connect to localhost port 3000 after 0 ms: Couldn't connect to server
+zero@zero-Dell-G15-5515:~/Desktop/Node/Node-Project/API_Roland$ curl -X POST http://localhost:3000/api/Users/Register \
+> -H "Content-Type: application/json" \
+> -d '{
+>   "Name": "Shehab",
+>   "Email": "shehab200088111@gmail.com",
+>   "Password": "Test123!@#"
+> }'
+{"message":"Registration successful","user":{"id":"68eeb2152834dce3b07e1227","Name":"Shehab","Email":"shehab200088111@gmail.com","Role":"User"}}zero@zero-Dell-G15-5515:~/Desktop/Node/Node-Project/API_Roland$ curl -X POST http://localhost:3000/api/Users/Login \
+> -H "Content-Type: application/json" \
+> -d '{
+>   "Email": "shehab200088111@gmail.com",
+>   "Password": "Test123!@#"
+> }'
+{"message":"Please verify your email before logging in."}zero@zero-Dell-G15-5515:~/Desktop/Node/Node-Project/API_Roland$ curl -X GET "http://localhost:3000/api/Users/verify/7ba2050693f487a3e74754c05e3a6173c9afd9906a386214e01e51906a4cc37a"
+{"message":"Email verified successfully!"}zero@zero-Dell-G15-5515:~/Desktop/Node/Node-Project/API_Roland$ curl -X POST http://localhost:3000/api/Users/Login \
+> -H "Content-Type: application/json" \
+> -d '{
+>   "Email": "shehab200088111@gmail.com",
+>   "Password": "Test123!@#"
+> }'
+{"message":"Login successful","user":{"id":"68eeb2152834dce3b07e1227","Name":"Shehab","Email":"shehab200088111@gmail.com","Role":"User","IsVerified":true},"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OGVlYjIxNTI4MzRkY2UzYjA3ZTEyMjciLCJlbWFpbCI6InNoZWhhYjIwMDA4ODExMUBnbWFpbC5jb20iLCJyb2xlIjoiVXNlciIsImlhdCI6MTc2MDQ3Mzc1MSwiZXhwIjoxNzYwNTYwMTUxfQ.4sYQIWl8vRPyhXFcRhB673mciZDOOkA6rHVi0XwLdE8"}zero@zero-Dell-G15-5515:~/Desktop/Node/Node-Project/API_Roland$ curl -X POST http://localhost:3000/api/Users/forgot-password \
+> -H "Content-Type: application/json" \
+> -d '{
+>   "Email": "shehab200088111@gmail.com"
+> }'
+{"message":"Reset password email sent successfully."}zero@zero-Dell-G15-5515:~/Desktop/Node/Node-Project/API_Roland$ curl -X POST "http://localhost:3000/api/Users/reset-password/6a5b3aa7c42ea60ca5355c26072464f3dd5aff5103cb91e5768b8ba199b7070d" \
+> -H "Content-Type: application/json" \
+> -d '{
+>   "newPassword": "NewPassword123!@#"
+> }'
+{"message":"Password has been reset successfully."}zero@zero-Dell-G15-5515:~/Desktop/Node/Node-Project/API_Roland$ curl -X POST http://localhost:3000/api/Users/Login \
+> -H "Content-Type: application/json" \
+> -d '{
+>   "Email": "shehab200088111@gmail.com",
+>   "Password": "NewPassword123!@#"
+> }'
+{"message":"Login successful","user":{"id":"68eeb2152834dce3b07e1227","Name":"Shehab","Email":"shehab200088111@gmail.com","Role":"User","IsVerified":true},"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OGVlYjIxNTI4MzRkY2UzYjA3ZTEyMjciLCJlbWFpbCI6InNoZWhhYjIwMDA4ODExMUBnbWFpbC5jb20iLCJyb2xlIjoiVXNlciIsImlhdCI6MTc2MDQ3MzgxMiwiZXhwIjoxNzYwNTYwMjEyfQ.wDajF4nHtf0dNZ7mQGsjSCZX1epx5pjDzR9zHkdKhTA"}
+

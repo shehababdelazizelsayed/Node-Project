@@ -25,7 +25,7 @@ const userSchema = new schema({
     default: false,
   },
   verificationToken: String,
-  verificationExpires: Data,
+  verificationExpires: Date,
   resetPasswordToken: String,
   resetPasswordExpires: Date,
 });
