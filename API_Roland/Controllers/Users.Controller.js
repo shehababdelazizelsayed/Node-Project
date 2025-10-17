@@ -2,19 +2,74 @@ const User = require("../models/User");
 const bcrypt = require("bcrypt");
 const crypto = require('crypto');
 const sendEmail = require("../utils/sendEmail");
-const { CheckForUser } = require("../Helpers/Login.Helper");
-
+const {
+  CheckForUser
+} = require("../Helpers/Login.Helper");
+const Joi = require('joi');
 const UserRegister = async (req, res) => {
   try {
-    const { Name, Email, Password, Role } = req.body;
+    const {
+      Name,
+      Email,
+      Password,
+      Role
+    } = req.body;
 
-    if (!Name || !Email || !Password) {
+    // if (!Name || !Email || !Password) {
+    //   return res.status(400).json({
+    //     message: "Name, Email and Password are required",
+    //   });
+    // }
+    const schema = Joi.object({
+        Name: Joi.string()
+          .pattern(/^[A-Za-z0-9 ]+$/)
+          .min(3)
+          .max(30)
+          .required()
+          .messages({
+            'string.pattern.base': 'Name can contain letters, numbers, and spaces only',
+          }),
+        Password: Joi.string().required()
+          .min(8).max(64).pattern(/^\S+$/)
+          .messages({
+            'string.pattern.base': 'password can contain letters, number,  only',
+          }),
+        Email: Joi.string().required().lowercase().trim()
+          .email({
+            minDomainSegments: 2,
+            tlds: {
+              allow: ['com', 'net']
+            }
+          }),
+        Token: Joi.string(),
+
+        Role: Joi.string()
+          .valid('User', 'Admin')
+          .empty('')
+          .default('User')
+          .messages({
+            'any.only': 'Role must be User ',
+          }),
+
+      })
+      .xor('Password', 'Token')
+    const {
+      error,
+      value
+    } = schema.validate(req.body, {
+      abortEarly: false,
+      stripUnknown: true
+    });
+    if (error) {
       return res.status(400).json({
-        message: "Name, Email and Password are required",
+        message: 'Validation error',
+        errors: error.details.map(d => d.message.replace(/"/g, '')),
       });
     }
 
-    const existingUser = await User.findOne({ Email });
+    const existingUser = await User.findOne({
+      Email
+    });
     if (existingUser) {
       return res.status(400).json({
         message: "Email already registered",
@@ -66,7 +121,10 @@ const UserLogin = async (req, res) => {
     const result = await CheckForUser(req, res);
     if (!result) return;
 
-    const { user, token } = result;
+    const {
+      user,
+      token
+    } = result;
 
     if (!user.IsVerified) {
       return res.status(403).json({
@@ -95,26 +153,72 @@ const UserLogin = async (req, res) => {
 
 const UserUpdate = async (req, res) => {
   try {
-    const userId = req.user.userId;
-    const user = await User.findById(userId);
 
+    const schema = Joi.object({
+        Name: Joi.string().trim().min(3).max(30),
+        Email: Joi.string().lowercase().trim().email({
+          tlds: {
+            allow: false
+          }
+        }),
+        NewPassword: Joi.string().min(8).max(64)
+          .pattern(/^\S+$/)
+          .messages({
+            'string.pattern.base': 'NewPassword must be 8–64 chars, no spaces',
+            'string.min': 'NewPassword must be at least 8 characters',
+            'string.max': 'NewPassword must be at most 64 characters',
+          }),
+        CurrentPassword: Joi.string().min(8).max(64)
+          .pattern(/^\S+$/)
+          .messages({
+            'string.pattern.base': 'CurrentPassword must be 8–64 chars, no spaces',
+            'string.min': 'CurrentPassword must be at least 8 characters',
+            'string.max': 'CurrentPassword must be at most 64 characters',
+          }),
+      })
+      .with('NewPassword', 'CurrentPassword')
+      .or('Name', 'Email', 'NewPassword');
+    const {
+      error,
+      value
+    } = schema.validate(req.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    });
+
+    if (error) {
+      return res.status(400).json({
+        message: 'Validation error',
+        errors: error.details.map(d => d.message.replace(/"/g, '')),
+      });
+    }
+    ////////////
+    const userId = req.user.userId; /////
+    const user = await User.findById(userId);
+    if (!userId) {
+      return res.status(401).json({
+        message: 'Unauthorized'
+      });
+    }
     if (!user) {
       return res.status(401).json({
         message: "User not found",
       });
     }
 
-    const updates = {};
 
-    // Handle name update
-    if (req.body.Name) {
-      updates.Name = req.body.Name;
+    const updates = {};
+    ////////
+    if (value.Name) { //////
+      updates.Name = value.Name; /////
     }
 
-    if (req.body.Email) {
+    if (value.Email && value.Email !== user.Email) {
       const emailExists = await User.findOne({
-        Email: req.body.Email.toLowerCase().trim(),
-        _id: { $ne: userId },
+        Email: value.Email.toLowerCase().trim(),
+        _id: {
+          $ne: userId
+        },
       });
 
       if (emailExists) {
@@ -122,12 +226,12 @@ const UserUpdate = async (req, res) => {
           message: "Email already in use",
         });
       }
-      updates.Email = req.body.Email.toLowerCase().trim();
+      updates.Email = value.Email.toLowerCase().trim();
     }
 
-    if (req.body.NewPassword) {
+    if (value.NewPassword) {
       // Require current password for security
-      if (!req.body.CurrentPassword) {
+      if (!value.CurrentPassword) {
         return res.status(400).json({
           message: "Current password is required to change password",
         });
@@ -135,7 +239,7 @@ const UserUpdate = async (req, res) => {
 
       // Verify current password
       const isValidPassword = await bcrypt.compare(
-        req.body.CurrentPassword,
+        value.CurrentPassword,
         user.Password
       );
       if (!isValidPassword) {
@@ -146,7 +250,7 @@ const UserUpdate = async (req, res) => {
 
       // Hash new password
       const salt = await bcrypt.genSalt(10);
-      updates.Password = await bcrypt.hash(req.body.NewPassword, salt);
+      updates.Password = await bcrypt.hash(value.NewPassword, salt);
     }
 
     // Check if there are any updates
@@ -158,10 +262,13 @@ const UserUpdate = async (req, res) => {
 
     // Update user
     const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      { $set: updates },
-      { new: true, runValidators: true }
-    );
+      userId, {
+        $set: updates
+      }, {
+        new: true,
+        runValidators: true
+      }
+    ).select('_id Name Email Role');
 
     return res.status(200).json({
       message: "Profile updated successfully",
@@ -184,25 +291,35 @@ const UserUpdate = async (req, res) => {
 // Verify Email
 const VerifyEmail = async (req, res) => {
   try {
-    const { token } = req.params;
+    const {
+      token
+    } = req.params;
 
     const user = await User.findOne({
       verificationToken: token,
-      verificationExpires: { $gt: Date.now() }
+      verificationExpires: {
+        $gt: Date.now()
+      }
     });
-    
+
     if (!user) {
-      return res.status(400).json({ message: "Invalid or expired verification link." });
+      return res.status(400).json({
+        message: "Invalid or expired verification link."
+      });
     }
 
     user.IsVerified = true;
     user.verificationToken = undefined;
     await user.save();
 
-    return res.status(200).json({ message: "Email verified successfully!" });
+    return res.status(200).json({
+      message: "Email verified successfully!"
+    });
   } catch (error) {
     console.error("VerifyEmail error:", error);
-    return res.status(500).json({ message: error.message });
+    return res.status(500).json({
+      message: error.message
+    });
   }
 };
 
@@ -210,11 +327,17 @@ const VerifyEmail = async (req, res) => {
 // Forgot Password
 const ForgotPassword = async (req, res) => {
   try {
-    const { Email } = req.body;
+    const {
+      Email
+    } = req.body;
 
-    const user = await User.findOne({ Email });
+    const user = await User.findOne({
+      Email
+    });
     if (!user) {
-      return res.status(404).json({ message: "No user found with this email." });
+      return res.status(404).json({
+        message: "No user found with this email."
+      });
     }
 
     const resetToken = crypto.randomBytes(32).toString("hex");
@@ -228,10 +351,14 @@ const ForgotPassword = async (req, res) => {
       "Reset your password",
       `Hi ${user.Name},\n\nClick the link below to reset your password:\n${resetLink}\n\nIf you didn’t request this, ignore the email.`
     );
-    res.status(200).json({ message: "Reset password email sent successfully." });
+    res.status(200).json({
+      message: "Reset password email sent successfully."
+    });
   } catch (error) {
     console.error("ForgotPassword error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({
+      message: error.message
+    });
   }
 };
 
@@ -239,16 +366,24 @@ const ForgotPassword = async (req, res) => {
 // Reset Password
 const ResetPassword = async (req, res) => {
   try {
-    const { token } = req.params;
-    const { newPassword } = req.body;
+    const {
+      token
+    } = req.params;
+    const {
+      newPassword
+    } = req.body;
 
     const user = await User.findOne({
       resetPasswordToken: token,
-      resetPasswordExpires: { $gt: Date.now() },
+      resetPasswordExpires: {
+        $gt: Date.now()
+      },
     });
 
     if (!user) {
-      return res.status(400).json({ message: "Invalid or expired token." });
+      return res.status(400).json({
+        message: "Invalid or expired token."
+      });
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -260,10 +395,14 @@ const ResetPassword = async (req, res) => {
 
     await user.save();
 
-    res.status(200).json({ message: "Password has been reset successfully." });
+    res.status(200).json({
+      message: "Password has been reset successfully."
+    });
   } catch (error) {
     console.error("ResetPassword error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({
+      message: error.message
+    });
   }
 };
 

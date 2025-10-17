@@ -3,7 +3,10 @@ dotenv.config();
 
 const express = require("express");
 const mongoose = require("mongoose");
-const { authMiddleware, authorizeRoles } = require("./Helpers/auth.middleware");
+const {
+  authMiddleware,
+  authorizeRoles
+} = require("./Helpers/auth.middleware");
 const {
   UserLogin,
   UserRegister,
@@ -23,20 +26,25 @@ const {
   GetCart,
   RemoveFromCart,
 } = require("./Controllers/Carts.Controller");
-const { CreateOrder, GetOrders } = require("./Controllers/Orders.Controller");
+const {
+  CreateOrder,
+  GetOrders
+} = require("./Controllers/Orders.Controller");
 const {
   CreateReview,
   GetBookReviews,
   EditReview,
   DeleteReview,
 } = require("./Controllers/Review.Controller");
-const { getAllBookUsers } = require("./Controllers/BookUsers.Controller");
+const {
+  getAllBookUsers
+} = require("./Controllers/BookUsers.Controller");
 
 const app = express();
-const port = 3000;
+const port = 5000;
 
 app.listen(port, () => {
-  console.log("server is running on port 3000");
+  console.log("server is running on port " + port);
 });
 mongoose
   .connect(process.env.Mongo_URL)

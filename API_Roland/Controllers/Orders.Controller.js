@@ -1,11 +1,29 @@
 const Order = require("../models/Order")
-const { CheckForUser } = require("../Helpers/Login.Helper");
+const {
+  CheckForUser
+} = require("../Helpers/Login.Helper");
 const Book = require("../models/Book");
 const Cart = require("../models/Cart");
+const mongoose = require("mongoose");
+const Joi = require("joi");
 
-async function CreateOrder(req,res) {
-    try {
-         const CheckUser = await CheckForUser(req, res);
+
+
+const createOrderSchema = Joi.object({
+  Books: Joi.array().items(
+    Joi.object({
+      BookId: Joi.string().trim().required(),
+      Quantity: Joi.number().integer().min(1).required(),
+    })
+  ).min(1).required(),
+});
+
+async function CreateOrder(req, res) {
+
+
+
+  try {
+    const CheckUser = await CheckForUser(req, res);
     if (!CheckUser) return;
     // const CheckCart = await Cart.findOne({ CheckUser: User._id });
     // if (!CheckCart) {
@@ -14,61 +32,196 @@ async function CreateOrder(req,res) {
     // }
     const body = req.body;
     if (!body || !Array.isArray(body.Books) || body.Books.length === 0) {
-      return res.status(400).json({ message: "Books array is required" });
+      return res.status(400).json({
+        message: "Books array is required"
+      });
     }
+    //   let totalPrice = 0;
+    //   for (let i = 0; i < body.Books.length; i++) {
+    //     const item = body.Books[i];
+
+    //     if (!item || !item.BookId) {
+    //       return res.status(400).json({
+    //         message: "Book not BookId is required at index " + i
+    //       });
+    //     }
+
+    //     const book = await Book.findById(item.BookId);
+    //     if (!book) {
+    //       return res.status(404).json({
+    //         message: "Book not found " + i
+    //       });
+    //     }
+
+    //     if (book.Stock == null || book.Stock < item.Quantity) {
+    //       return res.status(400).json({
+    //         message: "Not enough stock" + i
+    //       });
+    //     }
+
+
+
+    //     book.Stock = book.Stock - Number(item.Quantity);
+    //     await book.save();
+
+    //     totalPrice = totalPrice + (Number(book.Price) * Number(item.Quantity));
+    //   }
+
+    //   const created = await Order.create({
+    //     User: CheckUser._id,
+    //     Books: body.Books.map(Item => ({
+    //       BookId: Item.BookId,
+    //       Quantity: Number(Item.Quantity)
+    //     })),
+    //     TotalPrice: Number(totalPrice.toFixed(2)),
+    //     Status: "pending"
+    //   });
+
+    //   return res.status(201).json({
+    //     message: "Order placed",
+    //     orderId: created._id,
+    //     total: created.TotalPrice
+    //   });
+
+    const session = await mongoose.startSession();
     let totalPrice = 0;
-    for (let i = 0; i < body.Books.length; i++) {
-      const item = body.Books[i];
+    let created = null;
+    try {
+      await session.withTransaction(async () => {
+        totalPrice = 0;
 
-      if (!item || !item.BookId ) {
-        return res.status(400).json({ message: "Book not BookId is required at index " + i });
+        for (let i = 0; i < body.Books.length; i++) {
+
+          const item = body.Books[i];
+
+          if (!item || !item.BookId) {
+
+            throw new Error("VALIDATION_MISSING_BOOKID_" +
+              i);
+          }
+
+          const book = await Book.findById(item.BookId).session(session);
+          if (!book) {
+
+            throw new Error("NOT_FOUND_" +
+              i);
+          }
+
+          const qtyNum = Number(item.Quantity);
+          if (book.Stock == null || qtyNum < 1) {
+
+            throw new Error("INVALID_QTY_" +
+              i);
+          }
+
+          const reserve = await Book.updateOne({
+            _id: item.BookId,
+            Stock: {
+              $gte: qtyNum
+            }
+          }, {
+            $inc: {
+              Stock: -qtyNum
+            }
+          }, {
+            session
+          });
+          if (reserve.matchedCount === 0 || reserve.modifiedCount === 0) {
+
+            throw new Error("INSUFFICIENT_STOCK_" +
+              i);
+          }
+          totalPrice = totalPrice + (Number(book.Price) * qtyNum);
+        }
+        totalPrice = Number(totalPrice.toFixed(2));
+        created = await Order.create([{
+          User: CheckUser._id,
+          Books: body.Books.map(Item => ({
+            BookId: Item.BookId,
+            Quantity: Number(Item.Quantity)
+          })),
+          TotalPrice: totalPrice,
+          Status: "pending"
+        }], {
+          session
+        });
+        created = created[0];
+      });
+    } catch (trxErr) {
+
+      if (typeof trxErr.message === "string") {
+
+        if (trxErr.message.startsWith("VALIDATION_MISSING_BOOKID_")) {
+
+          const i = trxErr.message.split("_").pop();
+          return res.status(400).json({
+            message: "Book not BookId is required at index " +
+              i
+          });
+        }
+        if (trxErr.message.startsWith("NOT_FOUND_")) {
+
+          const i = trxErr.message.split("_").pop();
+          return res.status(404).json({
+            message: "Book not found " +
+              i
+          });
+        }
+        if (trxErr.message.startsWith("INVALID_QTY_")) {
+
+          const i = trxErr.message.split("_").pop();
+          return res.status(400).json({
+            message: "Not enough stock" +
+              i
+          });
+        }
+        if (trxErr.message.startsWith("INSUFFICIENT_STOCK_")) {
+
+          const i = trxErr.message.split("_").pop();
+          return res.status(400).json({
+            message: "Not enough stock" +
+              i
+          });
+        }
       }
+      throw trxErr;
 
-      const book = await Book.findById(item.BookId);
-      if (!book) {
-        return res.status(404).json({ message: "Book not found " + i });
-      }
-
-      if (book.Stock == null || book.Stock < item.Quantity) {
-        return res.status(400).json({ message: "Not enough stock" + i });
-      }
-
-   
-
-    book.Stock = book.Stock - Number(item.Quantity); 
-    await book.save();
-
-      totalPrice = totalPrice + (Number(book.Price) * Number(item.Quantity));
+    } finally {
+      session.endSession();
     }
 
-    const created = await Order.create({
-      User: CheckUser._id,
-      Books: body.Books.map(Item => ({ BookId: Item.BookId, Quantity: Number(Item.Quantity) })),
-      TotalPrice: Number(totalPrice.toFixed(2)),
-      Status: "pending"
-    });
 
     return res.status(201).json({
       message: "Order placed",
       orderId: created._id,
       total: created.TotalPrice
     });
+
   } catch (error) {
-   console.error("CreateOrder:", error);
-    res.status(500).json({ message: error.message });
-    }
+    console.error("CreateOrder:", error);
+    res.status(500).json({
+      message: error.message
+    });
+  }
 }
- async function  GetOrders(req,res){
-      try {
-              
-     const CheckUser = await CheckForUser(req, res);
+async function GetOrders(req, res) {
+  try {
+
+    const CheckUser = await CheckForUser(req, res);
     if (!CheckUser) return;
-    const UserOrders = await Order.find({ User: CheckUser._id })
+    const UserOrders = await Order.find({
+      User: CheckUser._id
+    })
     res.status(200).json(UserOrders);
   } catch (error) {
-   console.error("GetOrders:", error);
-    res.status(500).json({ message: error.message });
-    }
+    console.error("GetOrders:", error);
+    res.status(500).json({
+      message: error.message
+    });
+  }
 }
 
-module.exports={CreateOrder , GetOrders}
+module.exports = {
+  CreateOrder,
+  GetOrders
+}

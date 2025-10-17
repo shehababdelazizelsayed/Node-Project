@@ -1,7 +1,7 @@
 const User = require("../models/User");
 const Books = require("../models/Book");
 const checkUser = require("../Helpers/Login.Helper");
-
+const Joi = require('joi');
 
 
 
@@ -12,12 +12,28 @@ async function getAllBookUsers(req, res) {
 
   try {
 
-    const query = req.query;
-    const limit = parseInt(query.limit) || 10;
-    const page = parseInt(query.page) || 1;
+
+    const schema = Joi.object({
+      limit: Joi.number().integer().min(1).max(100).default(10),
+      page: Joi.number().integer().min(1).default(1),
+    }).unknown(false);
+    const {
+      error,
+      value
+    } = schema.validate(req.query, {
+      stripUnknown: true
+    });
+    if (error) {
+      return res.status(400).json({
+        message: 'Validation error',
+        errors: error.details.map(d => d.message.replace(/"/g, ''))
+      });
+    }
+
+    const query = value;
+    const limit = query.limit;
+    const page = query.page;
     const skip = (page - 1) * limit;
-
-
 
     // const UserEmail = await checkUser(req, res);
     // if (!UserEmail) {

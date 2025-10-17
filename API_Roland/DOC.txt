@@ -24,7 +24,7 @@ Req.body=
 "Password":""
 }
 =========================================================================
-put>>http://localhost:3000/api/Users/Profile  << UserUpdate
+patch>>http://localhost:3000/api/Users/Profile  << UserUpdate
 
 Email = req.header("UserEmail");
 Password = req.header("UserPassword");
