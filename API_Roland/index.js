@@ -1,6 +1,6 @@
 const dotenv = require("dotenv");
 dotenv.config();
-
+const path = require('path');
 const express = require("express");
 const mongoose = require("mongoose");
 const {
@@ -96,3 +96,7 @@ app.put("/api/Review/:id", authMiddleware, EditReview);
 app.delete("/api/Review/:id", authMiddleware, DeleteReview);
 
 app.get("/api/BookUsers", authMiddleware, getAllBookUsers);
+
+//uploads
+app.use('/static', express.static(path.join(__dirname, 'public')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

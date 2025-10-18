@@ -6,14 +6,18 @@ const authMiddleware = async (req, res, next) => {
     const token = req.header("Authorization")?.replace("Bearer ", "");
 
     if (!token) {
-      return res.status(401).json({ message: "Authentication required" });
+      return res.status(401).json({
+        message: "Authentication required"
+      });
     }
 
     const decoded = jwt.verify(token, config.JWT_SECRET);
     req.user = decoded;
     next();
   } catch (error) {
-    res.status(401).json({ message: "Invalid token" });
+    res.status(401).json({
+      message: "Invalid token"
+    });
   }
 };
 
@@ -21,7 +25,9 @@ const authMiddleware = async (req, res, next) => {
 const authorizeRoles = (...roles) => {
   return (req, res, next) => {
     if (!roles.includes(req.user.Role)) {
-      return res.status(403).json({ message: "Access denied" });
+      return res.status(403).json({
+        message: "Access denied"
+      });
     }
     next();
   };
@@ -29,4 +35,7 @@ const authorizeRoles = (...roles) => {
 
 
 
-module.exports = { authMiddleware, authorizeRoles };
+module.exports = {
+  authMiddleware,
+  authorizeRoles
+};
