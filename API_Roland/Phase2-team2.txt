@@ -1,0 +1,232 @@
+# Books API  - team 2 - roland & ahmed
+
+> This document explains the APIs
+
+---
+
+## ) CRUD + search , filter , sort
+
+This service lets you **add**, **edit**, **delete**, and **view** books.
+You can also **search**, **filter**, **sort**, and **paginate** results.
+All input data is validated with **Joi** to make sure it’s clean and correct.
+
+### What’s in it for you?
+
+* **Pagination** → View books page by page instead of loading everything at once.
+* **Filtering** → Narrow down results by category, keyword, or price.
+* **Sorting** → Sort books by title, price, stock, or date.
+* **Validation (Joi)** → Ensures safe and valid user input.
+
+### Quick start with Postman
+
+1. Import the provided **Collection** and **Environment** files.
+2. Run `AddBook` → then `GetBooks` → adjust filters like `search`, `page`, `limit`, etc.
+
+---
+
+## )  overview
+
+### Main Endpoints
+
+------------------------------------------------------------
+| AddBook     | POST   | `/api/BookUsers`     | Create a new book                                            |
+| UpdateBooks | PATCH  | `/api/BookUsers/:id` | Update a book                                                |
+| DeleteBook  | DELETE | `/api/BookUsers/:id` | Delete a book                                                |
+| GetBooks    | GET    | `/api/BookUsers`     | Retrieve all books
+
+(supports pagination, filtering, sorting) in `/api/books`
+
+### GetBooks Query Parameters
+
+--------------------------------------------------
+| `page`     | integer | 1         | Starting page                                      |
+| `limit`    | integer | 10        | Number of books per page (1–100)                   |
+| `sort`     | string  | createdAt | Sort field: `Title`, `Price`, `Stock`, `createdAt` |
+| `order`    | string  | desc      | Sorting order: `asc` or `desc`                     |
+| `search`   | string  | ""        | Search by Title or Author (regex)                  |
+| `Category` | string  | ""        | Filter by category                                 |
+| `priceMin` | number  | —         | Minimum price                                      |
+| `priceMax` | number  | —         | Maximum price                                      |
+| `inStock`  | boolean | —         | If `true`, only return items with stock > 0        |
+
+### Example Response (GetBooks)
+
+```json
+{
+  "message": "Books retrieved successfully",
+  "pagination": { "page": 1, "limit": 10, "total": 37, "pages": 4 },
+  "books": [ /* array of books */ ]
+}
+```
+
+---
+
+## ) Example Requests (Postman / cURL)
+
+### GetBooks (with filtering, sorting, pagination)
+
+**HTTP**
+
+```
+GET http://localhost:5000/api/books?page=1&limit=5&sort=createdAt&order=desc&search=Clean&Category=Programming&inStock=true
+Authorization: Bearer {{token}}
+```
+
+**cURL**
+
+```bash
+curl -X GET "http://localhost:5000/api/books?page=1&limit=5&sort=createdAt&order=desc&search=Clean&Category=Programming&inStock=true" \
+  -H "Authorization: Bearer {{token}}"
+```
+
+### AddBook
+
+```bash
+curl -X POST "http://localhost:5000/api/BookUsers" \
+  -H "Authorization: Bearer {{token}}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "Title": "Clean Code",
+    "Author": "Robert C. Martin",
+    "Price": 25.5,
+    "Description": "A handbook of agile software craftsmanship.",
+    "Stock": 5,
+    "Image": "",
+    "Category": "Programming",
+    "Pdf": ""
+  }'
+```
+
+### UpdateBooks
+
+```bash
+curl -X PATCH "http://localhost:5000/api/BookUsers/{{bookId}}" \
+  -H "Authorization: Bearer {{token}}" \
+  -H "Content-Type: application/json" \
+  -d '{ "Price": 27, "Stock": 7 }'
+```
+
+### DeleteBook
+
+```bash
+curl -X DELETE "http://localhost:5000/api/BookUsers/{{bookId}}" \
+  -H "Authorization: Bearer {{token}}"
+```
+
+---
+
+## ) Joi Validation
+
+### AddBook — Body Schema
+
+
+const schema = Joi.object({
+  Title: Joi.string().trim().min(1).required(),
+  Author: Joi.string().trim().min(1).required(),
+  Price: Joi.number().min(0).required(),
+  Description: Joi.string().trim().min(1).required(),
+  Stock: Joi.number().integer().min(0).default(0),
+  Image: Joi.string().trim().uri().allow('', null),
+  Category: Joi.string().trim().min(1).required(),
+  Pdf: Joi.string().trim().uri().allow('', null),
+});
+```
+
+
+
+const bodySchema = Joi.object({
+  Title: Joi.string().trim().min(1),
+  Author: Joi.string().trim().min(1),
+  Price: Joi.number().min(0),
+  Stock: Joi.number().integer().min(0),
+  Category: Joi.string().trim().min(1),
+  Description: Joi.string().trim().min(1),
+  Image: Joi.string().trim().uri().allow(''),
+  Pdf: Joi.string().trim().uri().allow(''),
+}).min(1);
+```
+
+
+### GetBooks — Query Schema
+
+```js
+const schema = Joi.object({
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(10),
+  sort: Joi.string().valid('Title','Price','Stock','createdAt').default('createdAt'),
+  order: Joi.string().valid('asc','desc').default('desc'),
+  search: Joi.string().trim().allow(''),
+  Category: Joi.string().trim().allow(''),
+  priceMin: Joi.number().min(0),
+  priceMax: Joi.number().min(0),
+  inStock: Joi.boolean(),
+}).unknown(false);
+```
+
+
+---
+
+## ) Filtering, Sorting, and Pagination Logic
+
+```js
+const query = value;
+const limit = query.limit;
+const page = query.page;
+const skip = (page - 1) * limit;
+
+// Filter
+const filter = {};
+if (query.search) {
+  filter.$or = [
+    { Title:  { $regex: query.search, $options: 'i' } },
+    { Author: { $regex: query.search, $options: 'i' } },
+  ];
+}
+if (query.Category) filter.Category = query.Category;
+if (query.priceMin != null || query.priceMax != null) {
+  filter.Price = {};
+}
+
+// Sort
+const sortDir = query.order === 'asc' ? 1 : -1;
+const sortObj = { [query.sort]: sortDir };
+
+const total = await Book.countDocuments(filter);
+const books = await Book.find(filter).sort(sortObj).skip(skip).limit(limit);
+```
+
+---
+
+## ) Common Errors and Status Codes
+
+| Code | Meaning          | Example                                         |
+| ---- | ---------------- | ----------------------------------------------- |
+| 400  | Validation error | Invalid fields or Joi rejection                 |
+| 401  | Unauthorized     | Missing or invalid token                        |
+| 403  | Forbidden        | User not allowed (not Admin/Owner)              |
+| 404  | Not found        | Book doesn’t exist                              |
+| 409  | Conflict         | Duplicate data (e.g., existing review or email) |
+
+---
+
+
+## )  Validation Checks
+
+**Use Pagination** for large lists.
+**Use Filtering** to help users find what they need faster.
+**Use Sorting** to improve browsing UX.
+**Use Joi Validation** on every input from the client.
+
+
+**Check** with Postman using the provided files.
+Ensure defaults, validation messages, and error responses are working.
+
+---
+
+## ) Postman Setup
+
+* **Collection**: `Books API — Quick Tests`
+* **Environment**: `Books API Local`
+* Variables used: `{{base_url}}`, `{{token}}`, `{{bookId}}`
+
+> Import both files, set your API URL and token, and start testing.

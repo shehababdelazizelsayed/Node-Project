@@ -1,0 +1,301 @@
+Security Implementation Documentation
+====================================
+
+1. Dependencies Added
+-------------------
+- bcrypt: For secure password hashing
+- jsonwebtoken: For generating and verifying JWT tokens
+
+2. Login Helper Changes (Login.Helper.js)
+---------------------------------------
+New Features:
+- Added bcrypt for password comparison
+- Implemented JWT token generation
+- Improved error messages for security
+- Added token generation function
+
+Key Changes:
+```javascript
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+
+// New JWT token generation function
+async function generateToken(user) {
+  return jwt.sign(
+    { userId: user._id, email: user.Email, role: user.Role },
+    JWT_SECRET,
+    { expiresIn: '24h' }
+  );
+}
+```
+
+Security improvements:
+- Replaced plain password comparison with bcrypt.compare()
+- Added JWT token generation
+- Enhanced error messages to prevent information leakage
+- Added support for both header and body parameters
+
+3. New Authentication Middleware (auth.middleware.js)
+-------------------------------------------------
+Created new file with two middleware functions:
+
+a) authMiddleware:
+- Verifies JWT tokens
+- Extracts user information
+- Protects routes from unauthorized access
+```javascript
+const authMiddleware = async (req, res, next) => {
+    try {
+        const token = req.header('Authorization')?.replace('Bearer ', '');
+        if (!token) {
+            return res.status(401).json({ message: 'Authentication required' });
+        }
+        const decoded = jwt.verify(token, JWT_SECRET);
+        req.user = decoded;
+        next();
+    } catch (error) {
+        res.status(401).json({ message: 'Invalid token' });
+    }
+};
+```
+
+b) adminMiddleware:
+- Checks user role for admin access
+- Provides additional layer of security for admin routes
+```javascript
+const adminMiddleware = async (req, res, next) => {
+    try {
+        if (req.user.role !== 'Admin') {
+            return res.status(403).json({ message: 'Admin access required' });
+        }
+        next();
+    } catch (error) {
+        res.status(403).json({ message: 'Access denied' });
+    }
+};
+```
+
+4. User Controller Updates (Users.Controller.js)
+--------------------------------------------
+Recent fixes and improvements:
+- Removed duplicate UserRegister function
+- Fixed password hashing consistency
+- Corrected role handling in registration
+- Improved error handling and messages
+
+a) Registration Enhancements:
+- Added password hashing before storage
+- Added email uniqueness validation
+- Improved input validation
+- Structured response data to exclude sensitive information
+- Fixed role assignment bug
+
+Key changes:
+```javascript
+// Hash password
+const salt = await bcrypt.genSalt(10);
+const hashedPassword = await bcrypt.hash(Password, salt);
+
+// Create new user with proper role handling
+const user = await User.create({
+  Name,
+  Email,
+  Password: hashedPassword,
+  Role: Role || "User"  // Fixed role assignment
+});
+```
+
+b) Login Improvements:
+- Integrated with new Login Helper
+- Added JWT token in response
+- Enhanced security checks
+- Structured response to exclude sensitive data
+- Improved error handling
+
+c) Profile Update Security (Major Overhaul):
+- Completely redesigned to use auth middleware
+- Removed old email/password header authentication
+- Added proper JWT-based authentication
+- Enhanced password change security
+- Improved email update validation
+- Better error handling and messages
+
+Key security features:
+```javascript
+// Get user from auth middleware (New JWT-based auth)
+const userId = req.user.userId;
+const user = await User.findById(userId);
+
+// Enhanced email update validation
+if (req.body.Email) {
+  const emailExists = await User.findOne({ 
+    Email: req.body.Email.toLowerCase().trim(),
+    _id: { $ne: userId }
+  });
+  
+  if (emailExists) {
+    return res.status(400).json({
+      message: "Email already in use"
+    });
+  }
+}
+
+// Secure password change with current password verification
+if (req.body.NewPassword) {
+  if (!req.body.CurrentPassword) {
+    return res.status(400).json({
+      message: "Current password is required to change password"
+    });
+  }
+
+  const isValidPassword = await bcrypt.compare(
+    req.body.CurrentPassword, 
+    user.Password
+  );
+  
+  if (!isValidPassword) {
+    return res.status(401).json({
+      message: "Current password is incorrect"
+    });
+  }
+
+  const salt = await bcrypt.genSalt(10);
+  updates.Password = await bcrypt.hash(req.body.NewPassword, salt);
+}
+```
+
+5. Security Best Practices Implemented
+----------------------------------
+1. Password Security:
+   - Passwords are never stored in plain text
+   - bcrypt used for hashing with salt
+   - Password comparison done securely
+
+2. Authentication:
+   - JWT tokens with expiration (24 hours)
+   - Secure token verification
+   - Protected routes with middleware
+
+3. Authorization:
+   - Role-based access control
+   - Admin-specific middleware
+   - Route protection based on user role
+
+4. Data Protection:
+   - Sensitive data excluded from responses
+   - Input validation and sanitization
+   - Email uniqueness enforcement
+   - Secure password change process
+
+6. How to Use Protected Routes
+---------------------------
+Example of protecting routes in your application:
+```javascript
+const { authMiddleware, adminMiddleware } = require('./Helpers/auth.middleware');
+
+// Public routes
+router.post('/register', UserRegister);
+router.post('/login', UserLogin);
+
+// Protected routes
+router.put('/profile', authMiddleware, UserUpdate);
+
+// Admin-only routes
+router.get('/admin/users', authMiddleware, adminMiddleware, AdminUserList);
+```
+
+7. API Authentication Flow
+------------------------
+1. User Registration:
+   - Send POST request to /register with Name, Email, and Password
+   - Receive user details (excluding password) in response
+
+2. User Login:
+   - Send POST request to /login with Email and Password
+   - Receive JWT token and user details in response
+
+3. Protected Endpoints:
+   - Include JWT token in Authorization header
+   - Format: "Bearer <your-token-here>"
+
+8. Security Recommendations
+-------------------------
+1. Environment Variables:
+   - Move JWT_SECRET to environment variables
+   - Use strong, unique secret keys
+
+2. Token Management:
+   - Implement token refresh mechanism
+   - Add token blacklisting for logout
+
+3. Rate Limiting:
+   - Consider adding rate limiting for login attempts
+   - Implement request throttling
+
+4. Additional Security:
+   - Add CORS configuration
+   - Implement request validation
+   - Add SSL/TLS in production
+   - Regular security audits
+
+---------------------------------------------------------
+
+Second part:
+
+
+Send verification email (OTP or token)
+
+Verify email → activate account
+
+password reset
+
+Role-based authorization
+---------------------------------------------
+
+ curl -X POST http://localhost:3000/api/Users/Register \
+  "Name": "Shehab",
+  "Email": "shehab200088111@gm> -H "Content-Type: application/json" \
+> -d '{
+>   "Name": "Shehab",
+>   "Email": "shehab200088111@gmail.com",
+>   "Password": "Test123!@#"
+> }'
+curl: (7) Failed to connect to localhost port 3000 after 0 ms: Couldn't connect to server
+zero@zero-Dell-G15-5515:~/Desktop/Node/Node-Project/API_Roland$ curl -X POST http://localhost:3000/api/Users/Register \
+> -H "Content-Type: application/json" \
+> -d '{
+>   "Name": "Shehab",
+>   "Email": "shehab200088111@gmail.com",
+>   "Password": "Test123!@#"
+> }'
+{"message":"Registration successful","user":{"id":"68eeb2152834dce3b07e1227","Name":"Shehab","Email":"shehab200088111@gmail.com","Role":"User"}}zero@zero-Dell-G15-5515:~/Desktop/Node/Node-Project/API_Roland$ curl -X POST http://localhost:3000/api/Users/Login \
+> -H "Content-Type: application/json" \
+> -d '{
+>   "Email": "shehab200088111@gmail.com",
+>   "Password": "Test123!@#"
+> }'
+{"message":"Please verify your email before logging in."}zero@zero-Dell-G15-5515:~/Desktop/Node/Node-Project/API_Roland$ curl -X GET "http://localhost:3000/api/Users/verify/7ba2050693f487a3e74754c05e3a6173c9afd9906a386214e01e51906a4cc37a"
+{"message":"Email verified successfully!"}zero@zero-Dell-G15-5515:~/Desktop/Node/Node-Project/API_Roland$ curl -X POST http://localhost:3000/api/Users/Login \
+> -H "Content-Type: application/json" \
+> -d '{
+>   "Email": "shehab200088111@gmail.com",
+>   "Password": "Test123!@#"
+> }'
+{"message":"Login successful","user":{"id":"68eeb2152834dce3b07e1227","Name":"Shehab","Email":"shehab200088111@gmail.com","Role":"User","IsVerified":true},"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OGVlYjIxNTI4MzRkY2UzYjA3ZTEyMjciLCJlbWFpbCI6InNoZWhhYjIwMDA4ODExMUBnbWFpbC5jb20iLCJyb2xlIjoiVXNlciIsImlhdCI6MTc2MDQ3Mzc1MSwiZXhwIjoxNzYwNTYwMTUxfQ.4sYQIWl8vRPyhXFcRhB673mciZDOOkA6rHVi0XwLdE8"}zero@zero-Dell-G15-5515:~/Desktop/Node/Node-Project/API_Roland$ curl -X POST http://localhost:3000/api/Users/forgot-password \
+> -H "Content-Type: application/json" \
+> -d '{
+>   "Email": "shehab200088111@gmail.com"
+> }'
+{"message":"Reset password email sent successfully."}zero@zero-Dell-G15-5515:~/Desktop/Node/Node-Project/API_Roland$ curl -X POST "http://localhost:3000/api/Users/reset-password/6a5b3aa7c42ea60ca5355c26072464f3dd5aff5103cb91e5768b8ba199b7070d" \
+> -H "Content-Type: application/json" \
+> -d '{
+>   "newPassword": "NewPassword123!@#"
+> }'
+{"message":"Password has been reset successfully."}zero@zero-Dell-G15-5515:~/Desktop/Node/Node-Project/API_Roland$ curl -X POST http://localhost:3000/api/Users/Login \
+> -H "Content-Type: application/json" \
+> -d '{
+>   "Email": "shehab200088111@gmail.com",
+>   "Password": "NewPassword123!@#"
+> }'
+{"message":"Login successful","user":{"id":"68eeb2152834dce3b07e1227","Name":"Shehab","Email":"shehab200088111@gmail.com","Role":"User","IsVerified":true},"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OGVlYjIxNTI4MzRkY2UzYjA3ZTEyMjciLCJlbWFpbCI6InNoZWhhYjIwMDA4ODExMUBnbWFpbC5jb20iLCJyb2xlIjoiVXNlciIsImlhdCI6MTc2MDQ3MzgxMiwiZXhwIjoxNzYwNTYwMjEyfQ.wDajF4nHtf0dNZ7mQGsjSCZX1epx5pjDzR9zHkdKhTA"}
+

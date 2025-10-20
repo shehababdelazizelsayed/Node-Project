@@ -1,0 +1,20 @@
+1. Authentication Enhancements and Error Handling
+
+A secure login system was implemented using JWT for token-based authentication and bcrypt for password hashing. The system now validates user credentials, generates a signed authentication token, and returns user information upon successful login. This ensures that only verified users can access protected areas of the application.
+
+2. Cloudinary Integration
+
+Cloudinary was set up as the project’s image hosting service. All uploaded images are stored securely on Cloudinary using environment variables for configuration. This makes file handling easier and more reliable, especially for deployment and scaling.
+
+3. Middleware Enhancements
+
+A new middleware layer was added to verify authentication tokens and check user roles.
+
+The verifyToken function confirms the validity of JWTs and attaches user data to requests.
+
+The isAdminOrOwner function restricts access to certain endpoints based on user roles.
+These additions strengthen overall API security and access control.
+
+4. Image Upload Route
+
+A dedicated upload route was created to handle single-image uploads. It validates the uploaded file, uploads it to Cloudinary, and returns the image URL in the response. This provides an easy and efficient way for the frontend to handle image uploads.
