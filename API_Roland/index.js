@@ -7,6 +7,10 @@ const mongoose = require("mongoose");
 const app = express();
 const port = 5000;
 
+
+const uploadRoute = require("./routes/uploadRoute");
+app.use("/api", uploadRoute);
+
 const {
   verifyToken,
   authorizeRoles

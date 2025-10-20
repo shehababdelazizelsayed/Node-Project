@@ -93,5 +93,34 @@ JWT_EXPIRES_IN = 7d
 | Insufficient Permissions  | 403    | Access Denied. You do not have permission.    |
 
 -------------------------------------------
+
+CLOUDINARY PDF INTEGRATION
+
+PURPOSE:
+This update enables uploading and storing book PDFs in Cloudinary, allowing each book to have a downloadable or viewable PDF file.
+
+It integrates Cloudinary into the backend and connects it to the Book model so every book can have a Pdf field that stores the Cloudinary URL.
+
+1-Book Model Update
+
+Added a new field Pdf to the Book schema to store the Cloudinary file URL.
+
+
+2-Upload Flow in Books Controller
+
+When creating a new book, the uploaded PDF file is sent to Cloudinary.
+
+Cloudinary returns a secure URL which is stored in the book document.
+
+
+3-Testing the Integration
+
+Use Postman with a POST request to /api/Books
+
+Form-data → key: Pdf, type: File (attach a PDF file)
+
+Other fields: Title, Author, etc.
+
+-------------------------------------------
  END OF DOCUMENTATION
 -------------------------------------------
