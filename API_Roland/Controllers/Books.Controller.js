@@ -1,9 +1,134 @@
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     Book:
+ *       type: object
+ *       required:
+ *         - Title
+ *         - Author
+ *         - Price
+ *         - Description
+ *         - Category
+ *       properties:
+ *         Title:
+ *           type: string
+ *           description: Book title
+ *         Author:
+ *           type: string
+ *           description: Book author
+ *         Price:
+ *           type: number
+ *           description: Book price
+ *         Description:
+ *           type: string
+ *           description: Book description
+ *         Stock:
+ *           type: integer
+ *           description: Book stock quantity
+ *         Image:
+ *           type: string
+ *           format: uri
+ *           description: Book image URL
+ *         Category:
+ *           type: string
+ *           description: Book category
+ *         Pdf:
+ *           type: string
+ *           format: uri
+ *           description: Book PDF URL
+ *         Owner:
+ *           type: string
+ *           description: Owner user ID
+ *       example:
+ *         Title: Sample Book
+ *         Author: John Doe
+ *         Price: 29.99
+ *         Description: A great book
+ *         Stock: 10
+ *         Category: Fiction
+ *         Image: http://example.com/image.jpg
+ *         Pdf: http://example.com/pdf.pdf
+ *         Owner: userId
+ */
+
 const Book = require("../models/Book");
 const Joi = require('joi');
 const cloudinary = require("../Helpers/cloudinary");
 const fs = require('fs');
 
-// Add
+/**
+ * @swagger
+ * /api/Books:
+ *   post:
+ *     summary: Add a new book
+ *     tags: [Books]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - Title
+ *               - Author
+ *               - Price
+ *               - Description
+ *               - Category
+ *             properties:
+ *               Title:
+ *                 type: string
+ *                 description: Book title
+ *               Author:
+ *                 type: string
+ *                 description: Book author
+ *               Price:
+ *                 type: number
+ *                 description: Book price
+ *               Description:
+ *                 type: string
+ *                 description: Book description
+ *               Stock:
+ *                 type: integer
+ *                 description: Book stock quantity
+ *               Image:
+ *                 type: string
+ *                 format: uri
+ *                 description: Book image URL
+ *               Category:
+ *                 type: string
+ *                 description: Book category
+ *               Pdf:
+ *                 type: string
+ *                 format: uri
+ *                 description: Book PDF URL (optional if file is uploaded)
+ *               pdf:
+ *                 type: string
+ *                 format: binary
+ *                 description: PDF file to upload
+ *     responses:
+ *       201:
+ *         description: Book created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 Book:
+ *                   $ref: '#/components/schemas/Book'
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       500:
+ *         description: Internal server error
+ */
 async function AddBook(req, res) {
   try {
 
@@ -105,7 +230,77 @@ async function AddBook(req, res) {
 };
 
 
-// Update
+/**
+ * @swagger
+ * /api/Books/{id}:
+ *   put:
+ *     summary: Update a book
+ *     tags: [Books]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Book ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               Title:
+ *                 type: string
+ *                 description: Book title
+ *               Author:
+ *                 type: string
+ *                 description: Book author
+ *               Price:
+ *                 type: number
+ *                 description: Book price
+ *               Description:
+ *                 type: string
+ *                 description: Book description
+ *               Stock:
+ *                 type: integer
+ *                 description: Book stock quantity
+ *               Image:
+ *                 type: string
+ *                 format: uri
+ *                 description: Book image URL
+ *               Category:
+ *                 type: string
+ *                 description: Book category
+ *               Pdf:
+ *                 type: string
+ *                 format: uri
+ *                 description: Book PDF URL
+ *     responses:
+ *       200:
+ *         description: Book updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 Book:
+ *                   $ref: '#/components/schemas/Book'
+ *       400:
+ *         description: Validation error or invalid ID
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Book not found
+ *       500:
+ *         description: Internal server error
+ */
 async function UpdateBooks(req, res) {
   try {
 
@@ -221,7 +416,44 @@ async function UpdateBooks(req, res) {
 }
 
 
-// Delete
+/**
+ * @swagger
+ * /api/Books/{id}:
+ *   delete:
+ *     summary: Delete a book
+ *     tags: [Books]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Book ID
+ *     responses:
+ *       200:
+ *         description: Book deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 Book:
+ *                   $ref: '#/components/schemas/Book'
+ *       400:
+ *         description: Invalid ID
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Book not found
+ *       500:
+ *         description: Internal server error
+ */
 async function DeleteBook(req, res) {
   try {
     const paramsSchema = Joi.object({
@@ -275,7 +507,99 @@ async function DeleteBook(req, res) {
 }
 
 
-// Get
+/**
+ * @swagger
+ * /api/Books:
+ *   get:
+ *     summary: Get books with pagination and filters
+ *     tags: [Books]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 2
+ *           maximum: 100
+ *           default: 2
+ *         description: Number of books per page
+ *       - in: query
+ *         name: sort
+ *         schema:
+ *           type: string
+ *           enum: [Title, Price, Stock, createdAt]
+ *           default: createdAt
+ *         description: Sort field
+ *       - in: query
+ *         name: order
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *           default: desc
+ *         description: Sort order
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search in title or author
+ *       - in: query
+ *         name: Category
+ *         schema:
+ *           type: string
+ *         description: Filter by category
+ *       - in: query
+ *         name: priceMin
+ *         schema:
+ *           type: number
+ *           minimum: 0
+ *         description: Minimum price
+ *       - in: query
+ *         name: priceMax
+ *         schema:
+ *           type: number
+ *           minimum: 0
+ *         description: Maximum price
+ *       - in: query
+ *         name: inStock
+ *         schema:
+ *           type: boolean
+ *         description: Filter books in stock
+ *     responses:
+ *       200:
+ *         description: Books retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     page:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
+ *                     total:
+ *                       type: integer
+ *                     pages:
+ *                       type: integer
+ *                 books:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Book'
+ *       400:
+ *         description: Validation error
+ *       500:
+ *         description: Internal server error
+ */
 async function GetBooks(req, res) {
   try {
     // const books = await Book.find();
@@ -377,9 +701,76 @@ async function GetBooks(req, res) {
   }
 }
 
+/**
+ * @swagger
+ * /api/Books/{id}:
+ *   get:
+ *     summary: Get a single book by ID
+ *     tags: [Books]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Book ID
+ *     responses:
+ *       200:
+ *         description: Book retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 book:
+ *                   $ref: '#/components/schemas/Book'
+ *       400:
+ *         description: Invalid ID
+ *       404:
+ *         description: Book not found
+ *       500:
+ *         description: Internal server error
+ */
+async function GetBook(req, res) {
+  try {
+    const paramsSchema = Joi.object({
+      id: Joi.string().hex().length(24).required()
+    });
+    const vParams = paramsSchema.validate(req.params, {
+      stripUnknown: true
+    });
+    if (vParams.error) return res.status(400).json({
+      message: 'Invalid id'
+    });
+    const {
+      id
+    } = vParams.value;
+
+    const book = await Book.findById(id);
+    if (!book) {
+      return res.status(404).json({
+        message: "Book not found"
+      });
+    }
+
+    return res.status(200).json({
+      message: "Book retrieved successfully",
+      book: book
+    });
+  } catch (error) {
+    console.error("GetBook:", error);
+    return res.status(500).json({
+      message: error.message
+    });
+  }
+}
+
 module.exports = {
   AddBook,
   GetBooks,
+  GetBook,
   UpdateBooks,
   DeleteBook
 };

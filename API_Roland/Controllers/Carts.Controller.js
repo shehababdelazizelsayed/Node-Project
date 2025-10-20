@@ -1,9 +1,94 @@
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     CartItem:
+ *       type: object
+ *       properties:
+ *         Book:
+ *           type: string
+ *           description: Book ID
+ *         Quantity:
+ *           type: integer
+ *           minimum: 1
+ *           description: Quantity of the book
+ *       required:
+ *         - Book
+ *         - Quantity
+ *     Cart:
+ *       type: object
+ *       properties:
+ *         User:
+ *           type: string
+ *           description: User ID
+ *         Items:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/CartItem'
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ */
+
 const Cart = require("../models/Cart");
 const Book = require("../models/Book");
 const {
   CheckForUser
 } = require("../Helpers/Login.Helper");
 const Joi = require('joi');
+
+/**
+ * @swagger
+ * /api/Carts:
+ *   post:
+ *     summary: Add book to cart
+ *     tags: [Carts]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - BookId
+ *             properties:
+ *               BookId:
+ *                 type: string
+ *                 description: Book ID to add to cart
+ *               Qty:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 999
+ *                 default: 1
+ *                 description: Quantity to add
+ *     responses:
+ *       201:
+ *         description: Book added to cart successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 Cart:
+ *                   $ref: '#/components/schemas/Cart'
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Book not found
+ *       405:
+ *         description: Out of stock
+ *       500:
+ *         description: Internal server error
+ */
 async function AddToCart(req, res) {
   try {
     const CheckUser = await CheckForUser(req, res);
@@ -136,6 +221,35 @@ async function AddToCart(req, res) {
   }
 }
 
+/**
+ * @swagger
+ * /api/Carts:
+ *   get:
+ *     summary: Get user's cart
+ *     tags: [Carts]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Cart retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 Cart:
+ *                   $ref: '#/components/schemas/Cart'
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Cart not found
+ *       500:
+ *         description: Internal server error
+ */
 async function GetCart(req, res) {
   try {
     const CheckUser = await CheckForUser(req, res);
@@ -188,6 +302,42 @@ async function GetCart(req, res) {
 
 }
 
+/**
+ * @swagger
+ * /api/Carts/{id}:
+ *   delete:
+ *     summary: Remove book from cart
+ *     tags: [Carts]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Book ID to remove from cart
+ *     responses:
+ *       200:
+ *         description: Book removed from cart successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 Cart:
+ *                   $ref: '#/components/schemas/Cart'
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Cart or book not found
+ *       500:
+ *         description: Internal server error
+ */
 async function RemoveFromCart(req, res) {
   try {
     const CheckUser = await CheckForUser(req, res);

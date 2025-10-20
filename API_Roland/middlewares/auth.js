@@ -9,6 +9,7 @@ const verifyToken = (req,res,next)=> {
    const token = authHeader.split(" ")[1];
    const decoded = jwt.verify(token,process.env.JWT_SECRET);
    req.user = decoded;
+   req.user.Role = decoded.role; // Ensure Role is set for consistency
    next();
   } catch (error) {
     if(error.name === "TokenExpiredError"){

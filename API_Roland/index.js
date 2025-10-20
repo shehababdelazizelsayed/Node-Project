@@ -7,6 +7,8 @@ const mongoose = require("mongoose");
 const app = express();
 const port = 5000;
 
+const { swaggerUi, specs } = require('./swagger');
+
 const uploadRoute = require("./routes/uploadRoute");
 app.use("/api", uploadRoute);
 
@@ -24,6 +26,7 @@ const {
 const {
   AddBook,
   GetBooks,
+  GetBook,
   UpdateBooks,
   DeleteBook,
 } = require("./Controllers/Books.Controller");
@@ -64,6 +67,7 @@ app.patch("/api/Users/Profile", authMiddleware, UserUpdate);
 
 // Books Routes
 app.get("/api/Books", GetBooks);
+app.get("/api/Books/:id", GetBook);
 app.post(
   "/api/Books",
   authMiddleware,
@@ -102,11 +106,15 @@ app.delete("/api/Review/:id", authMiddleware, DeleteReview);
 //  BookUsers Routes
 app.get("/api/BookUsers", authMiddleware, getAllBookUsers);
 
+// Swagger
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
+
 //uploads
 app.use("/static", express.static(path.join(__dirname, "public")));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.listen(port, () => {
   console.log("server is running on port " + port);
+   console.log(`Swagger docs available at http://localhost:${port}/api-docs`);
 });
 app.post("/api/ai", authMiddleware, queryBooksWithAI);
