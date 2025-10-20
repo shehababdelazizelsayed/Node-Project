@@ -1,9 +1,11 @@
 const dotenv = require("dotenv");
 dotenv.config();
+
+const express = require("express");
 const path = require('path');
-
 const mongoose = require("mongoose");
-
+const app = express();
+const port = 5000;
 
 const {
   verifyToken,
@@ -41,65 +43,75 @@ const {
 const {
   getAllBookUsers
 } = require("./Controllers/BookUsers.Controller");
+const { log } = require("console");
 
 
-const app = express();
-const port = 5000;
 
-app.listen(port, () => {
-  console.log("server is running on port " + port);
-});
+
+
+
 mongoose
   .connect(process.env.Mongo_URL)
   .then(() => console.log("Connected!"))
   .catch(() => {
     console.log("Connected Failed ");
   });
+  console.log(process.env.Mongo_URL);
 
 app.use(express.json());
 
+//  Users Routes
 app.post("/api/Users/Register", UserRegister);
 app.post("/api/Users/Login", UserLogin);
 app.get("/api/Users/verify/:token", VerifyEmail);
 app.post("/api/Users/forgot-password", ForgotPassword);
 app.post("/api/Users/reset-password/:token", ResetPassword);
 
-app.patch("/api/Users/Profile", authMiddleware, UserUpdate);
+app.patch("/api/Users/Profile", verifyToken, UserUpdate);
 
+// Books Routes
 app.get("/api/Books", GetBooks);
 app.post(
   "/api/Books",
-  authMiddleware,
+  verifyToken,
   authorizeRoles("Owner", "Admin"),
   AddBook
 );
 app.put(
   "/api/Books/:id",
-  authMiddleware,
+  verifyToken,
   authorizeRoles("Owner", "Admin"),
   UpdateBooks
 );
 app.delete(
   "/api/Books/:id",
-  authMiddleware,
+  verifyToken,
   authorizeRoles("Owner", "Admin"),
   DeleteBook
 );
 
-app.post("/api/Cart", authMiddleware, AddToCart);
-app.get("/api/Cart", authMiddleware, GetCart);
-app.delete("/api/Cart/:id", authMiddleware, RemoveFromCart);
+// Cart Routes
+app.post("/api/Cart", verifyToken, AddToCart);
+app.get("/api/Cart", verifyToken, GetCart);
+app.delete("/api/Cart/:id", verifyToken, RemoveFromCart);
 
-app.post("/api/Orders", authMiddleware, CreateOrder);
-app.get("/api/Orders", authMiddleware, GetOrders);
+//  Orders Routes
+app.post("/api/Orders", verifyToken, CreateOrder);
+app.get("/api/Orders", verifyToken, GetOrders);
 
-app.post("/api/Reviews", authMiddleware, CreateReview);
+//  Reviews Routes
+app.post("/api/Reviews", verifyToken, CreateReview);
 app.get("/api/Reviews/:id", GetBookReviews);
-app.put("/api/Review/:id", authMiddleware, EditReview);
-app.delete("/api/Review/:id", authMiddleware, DeleteReview);
+app.put("/api/Review/:id", verifyToken, EditReview);
+app.delete("/api/Review/:id", verifyToken, DeleteReview);
 
-app.get("/api/BookUsers", authMiddleware, getAllBookUsers);
+//  BookUsers Routes
+app.get("/api/BookUsers", verifyToken, getAllBookUsers);
 
 //uploads
 app.use('/static', express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+app.listen(port, () => {
+  console.log("server is running on port " + port);
+});
