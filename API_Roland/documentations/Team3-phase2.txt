@@ -1,0 +1,97 @@
+===========================================
+AUTH MIDDLEWARE DOCUMENTATION
+File: API_Roland/middlewares/auth.js
+===========================================
+
+ PURPOSE:
+This middleware is responsible for protecting private routes by verifying JWT tokens
+and restricting access based on user roles (e.g., Owner, Admin, User).
+
+It ensures that only authenticated users — and those with the right permissions —
+can access certain parts of the API.
+
+-------------------------------------------
+ FUNCTIONS
+-------------------------------------------
+
+1️ verifyToken(req, res, next)
+-------------------------------------------
+✔ PURPOSE:
+   - Checks if the request contains a valid JWT token in the Authorization header.
+
+✔ FLOW:
+   1. Looks for token in headers → "Authorization: Bearer <token>"
+   2. If no token → returns:
+      { "message": "Access Denied. No Token Provided." }
+   3. If token exists → verifies it using jwt.verify()
+   4. If valid → attaches decoded user data to req.user
+   5. Calls next() to continue to the next middleware or controller
+
+✔ USAGE EXAMPLE:
+   const { verifyToken } = require('../middlewares/auth');
+   app.get('/api/Orders', verifyToken, GetOrders);
+
+-------------------------------------------
+
+2️ authorizeRoles(...roles)
+-------------------------------------------
+✔ PURPOSE:
+   - Restricts route access to users with specific roles (e.g., Admin, Owner).
+
+✔ FLOW:
+   1. Runs after verifyToken.
+   2. Checks if the user’s role exists in the allowed roles array.
+   3. If not → returns:
+      { "message": "Access Denied. You do not have permission." }
+   4. If yes → continues with next().
+
+✔ USAGE EXAMPLE:
+   const { verifyToken, authorizeRoles } = require('../middlewares/auth');
+
+   app.post(
+     '/api/Books',
+     verifyToken,
+     authorizeRoles('Owner', 'Admin'),
+     AddBook
+   );
+
+-------------------------------------------
+ EXAMPLE INTEGRATION
+-------------------------------------------
+
+const { verifyToken, authorizeRoles } = require("../middlewares/auth");
+
+// Route accessible to all logged-in users
+app.get("/api/Cart", verifyToken, GetCart);
+
+// Route accessible only to Admin or Owner
+app.delete(
+  "/api/Books/:id",
+  verifyToken,
+  authorizeRoles("Owner", "Admin"),
+  DeleteBook
+);
+
+-------------------------------------------
+⚙ DEPENDENCIES
+-------------------------------------------
+- jsonwebtoken → for decoding and verifying JWT tokens
+- dotenv → to load environment variables (like JWT secret key)
+
+Example .env:
+-------------------------------------------
+JWT_SECRET = yourSecretKey
+JWT_EXPIRES_IN = 7d
+
+-------------------------------------------
+ COMMON ERROR RESPONSES
+-------------------------------------------
+| Scenario                 | Status | Message                                       |
+|---------------------------|--------|------------------------------------------------|
+| No Token Provided         | 401    | Access Denied. No Token Provided.             |
+| Invalid Token             | 403    | Invalid Token.                                |
+| Insufficient Permissions  | 403    | Access Denied. You do not have permission.    |
+
+-------------------------------------------
+ END OF DOCUMENTATION
+-------------------------------------------
