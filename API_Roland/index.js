@@ -2,21 +2,17 @@ const dotenv = require("dotenv");
 dotenv.config();
 
 const express = require("express");
-const path = require('path');
+const path = require("path");
 const mongoose = require("mongoose");
 const app = express();
 const port = 5000;
-
 
 const uploadRoute = require("./routes/uploadRoute");
 app.use("/api", uploadRoute);
 
 const upload = require("./Helpers/upload");
 
-const {
-  verifyToken,
-  authorizeRoles
-} = require("./middlewares/auth");
+const { authMiddleware, authorizeRoles } = require("./Helpers/auth.middleware");
 const {
   UserLogin,
   UserRegister,
@@ -36,25 +32,16 @@ const {
   GetCart,
   RemoveFromCart,
 } = require("./Controllers/Carts.Controller");
-const {
-  CreateOrder,
-  GetOrders
-} = require("./Controllers/Orders.Controller");
+const { CreateOrder, GetOrders } = require("./Controllers/Orders.Controller");
 const {
   CreateReview,
   GetBookReviews,
   EditReview,
   DeleteReview,
 } = require("./Controllers/Review.Controller");
-const {
-  getAllBookUsers
-} = require("./Controllers/BookUsers.Controller");
+const { getAllBookUsers } = require("./Controllers/BookUsers.Controller");
 const { log } = require("console");
-
-
-
-
-
+const { queryBooksWithAI } = require("./Controllers/ai.controller");
 
 mongoose
   .connect(process.env.Mongo_URL)
@@ -62,8 +49,7 @@ mongoose
   .catch(() => {
     console.log("Connected Failed ");
   });
-  console.log(process.env.Mongo_URL);
-
+console.log(process.env.Mongo_URL);
 
 app.use(express.json());
 
@@ -74,52 +60,53 @@ app.get("/api/Users/verify/:token", VerifyEmail);
 app.post("/api/Users/forgot-password", ForgotPassword);
 app.post("/api/Users/reset-password/:token", ResetPassword);
 
-app.patch("/api/Users/Profile", verifyToken, UserUpdate);
+app.patch("/api/Users/Profile", authMiddleware, UserUpdate);
 
 // Books Routes
 app.get("/api/Books", GetBooks);
 app.post(
   "/api/Books",
-  verifyToken,
+  authMiddleware,
   authorizeRoles("Owner", "Admin"),
   upload.single("pdf"),
   AddBook
 );
 app.put(
   "/api/Books/:id",
-  verifyToken,
+  authMiddleware,
   authorizeRoles("Owner", "Admin"),
   UpdateBooks
 );
 app.delete(
   "/api/Books/:id",
-  verifyToken,
+  authMiddleware,
   authorizeRoles("Owner", "Admin"),
   DeleteBook
 );
 
 // Cart Routes
-app.post("/api/Cart", verifyToken, AddToCart);
-app.get("/api/Cart", verifyToken, GetCart);
-app.delete("/api/Cart/:id", verifyToken, RemoveFromCart);
+app.post("/api/Cart", authMiddleware, AddToCart);
+app.get("/api/Cart", authMiddleware, GetCart);
+app.delete("/api/Cart/:id", authMiddleware, RemoveFromCart);
 
 //  Orders Routes
-app.post("/api/Orders", verifyToken, CreateOrder);
-app.get("/api/Orders", verifyToken, GetOrders);
+app.post("/api/Orders", authMiddleware, CreateOrder);
+app.get("/api/Orders", authMiddleware, GetOrders);
 
 //  Reviews Routes
-app.post("/api/Reviews", verifyToken, CreateReview);
+app.post("/api/Reviews", authMiddleware, CreateReview);
 app.get("/api/Reviews/:id", GetBookReviews);
-app.put("/api/Review/:id", verifyToken, EditReview);
-app.delete("/api/Review/:id", verifyToken, DeleteReview);
+app.put("/api/Review/:id", authMiddleware, EditReview);
+app.delete("/api/Review/:id", authMiddleware, DeleteReview);
 
 //  BookUsers Routes
-app.get("/api/BookUsers", verifyToken, getAllBookUsers);
+app.get("/api/BookUsers", authMiddleware, getAllBookUsers);
 
 //uploads
-app.use('/static', express.static(path.join(__dirname, 'public')));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use("/static", express.static(path.join(__dirname, "public")));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.listen(port, () => {
   console.log("server is running on port " + port);
 });
+app.post("/api/ai", authMiddleware, queryBooksWithAI);
