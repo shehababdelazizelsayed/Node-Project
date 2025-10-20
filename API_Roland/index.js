@@ -11,6 +11,8 @@ const port = 5000;
 const uploadRoute = require("./routes/uploadRoute");
 app.use("/api", uploadRoute);
 
+const upload = require("./Helpers/upload");
+
 const {
   verifyToken,
   authorizeRoles
@@ -80,6 +82,7 @@ app.post(
   "/api/Books",
   verifyToken,
   authorizeRoles("Owner", "Admin"),
+  upload.single("pdf"),
   AddBook
 );
 app.put(

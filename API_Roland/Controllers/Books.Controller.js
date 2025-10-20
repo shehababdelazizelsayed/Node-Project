@@ -1,5 +1,7 @@
 const Book = require("../models/Book");
 const Joi = require('joi');
+const cloudinary = require("../Helpers/cloudinary");
+const fs = require('fs');
 
 // Add
 async function AddBook(req, res) {
@@ -40,6 +42,22 @@ async function AddBook(req, res) {
       Pdf
     } = value;
 
+    let pdfUrl = Pdf;
+    if (req.file) {
+      try {
+        const result = await cloudinary.uploader.upload(req.file.path, {
+          resource_type: "raw",
+          folder: "books/pdfs"
+        });
+        pdfUrl = result.secure_url;
+        fs.unlinkSync(req.file.path); // Remove local file after upload
+      } catch (uploadError) {
+        console.error("Cloudinary upload error:", uploadError);
+        return res.status(500).json({
+          message: "Failed to upload PDF to Cloudinary"
+        });
+      }
+    }
 
     // if (!Title || !Author || !Price || !Description || !Category) {
     //   return res.status(400).json({
@@ -69,7 +87,7 @@ async function AddBook(req, res) {
       Category,
       Description,
       Image,
-      Pdf,
+      Pdf: pdfUrl,
       Owner: req.user.userId,
     });
 
