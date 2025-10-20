@@ -1,12 +1,14 @@
 const dotenv = require("dotenv");
 dotenv.config();
 const path = require('path');
-const express = require("express");
+
 const mongoose = require("mongoose");
+
+
 const {
-  authMiddleware,
+  verifyToken,
   authorizeRoles
-} = require("./Helpers/auth.middleware");
+} = require("./middlewares/auth");
 const {
   UserLogin,
   UserRegister,
@@ -39,6 +41,7 @@ const {
 const {
   getAllBookUsers
 } = require("./Controllers/BookUsers.Controller");
+
 
 const app = express();
 const port = 5000;
