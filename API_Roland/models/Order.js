@@ -18,15 +18,44 @@ const orderSchema = new schema({
       },
     },
   ],
-
   TotalPrice: {
     type: Number,
     required: true,
   },
   Status: {
     type: String,
-    enum: ["pending", "completed"],
+    enum: ["pending", "completed", "cancelled", "refunded"],
     default: "pending",
+  },
+  PaymentProvider: {
+    type: String,
+    enum: ["PayPal", "Cash"],
+    default: "Cash",
+  },
+  PaymentStatus: {
+    type: String,
+    enum: ["unpaid", "paid", "refunded"],
+    default: "unpaid",
+  },
+  PayPalOrderId: {
+    type: String,
+  },
+  PayPalCaptureId: {
+    type: String,
+  },
+  StoreId: {
+    type: String,
+    default: "BOOKSTORE_001",
+  },
+  ReferenceId: {
+    type: String,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+  CompletedAt: {
+    type: Date,
   },
 });
 
