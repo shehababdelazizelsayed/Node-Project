@@ -9,8 +9,8 @@ const {
 async function CreateReview(req, res) {
   try {
 
-    const CheckUser = await CheckForUser(req, res);
-    if (!CheckUser) return;
+    // const CheckUser = await CheckForUser(req, res);
+    // if (!CheckUser) return;
     const schema = Joi.object({
       BookId: Joi.string().hex().length(24).required()
         .messages({
@@ -91,7 +91,7 @@ async function CreateReview(req, res) {
 
 
     const exists = await Review.findOne({
-      User: CheckUser._id,
+      User: req.user.userId,
       Book: BookId
     });
     if (exists) {
@@ -102,7 +102,7 @@ async function CreateReview(req, res) {
 
 
     const created = await Review.create({
-      User: CheckUser._id,
+      User: req.user.userId,
       Book: BookId,
       Rating: RatingNum,
       Review: ReviewText
@@ -129,8 +129,8 @@ async function CreateReview(req, res) {
 
 async function GetBookReviews(req, res) {
   try {
-    const CheckUser = await CheckForUser(req, res);
-    if (!CheckUser) return;
+    // const CheckUser = await CheckForUser(req, res);
+    // if (!CheckUser) return;
     const schema = Joi.object({
       id: Joi.string().hex().length(24).required()
     });
@@ -170,8 +170,8 @@ async function GetBookReviews(req, res) {
 }
 async function EditReview(req, res) {
   try {
-    const CheckUser = await CheckForUser(req, res);
-    if (!CheckUser) return;
+    // const CheckUser = await CheckForUser(req, res);
+    // if (!CheckUser) return;
     const paramsSchema = Joi.object({
       id: Joi.string().hex().length(24).required()
     });
@@ -269,8 +269,8 @@ async function EditReview(req, res) {
 
 async function DeleteReview(req, res) {
   try {
-    const CheckUser = await CheckForUser(req, res);
-    if (!CheckUser) return;
+    // const CheckUser = await CheckForUser(req, res);
+    // if (!CheckUser) return;
     const schema = Joi.object({
       id: Joi.string().hex().length(24).required()
     });
@@ -299,7 +299,7 @@ async function DeleteReview(req, res) {
       });
     }
 
-    if (String(CheckId.User) !== String(CheckUser._id)) {
+    if (String(CheckId.User) !== String(req.user.userId) && req.user.Role !== 'Admin') {
       return res.status(403).json({
         message: "Not allowed to delete this review"
       });

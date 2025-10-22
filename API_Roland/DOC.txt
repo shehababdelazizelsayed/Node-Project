@@ -32,8 +32,8 @@ Password = req.header("UserPassword");
 
 req.body={
 	"Name":"",
-	"NewEmail":"",
-	"NewPassword":""
+	"Email":"",
+	"Password":""
 }
 =========================================================================
 Note "You most be Admin"

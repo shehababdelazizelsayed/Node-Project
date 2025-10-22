@@ -156,11 +156,11 @@ const UserUpdate = async (req, res) => {
 
     const schema = Joi.object({
         Name: Joi.string().trim().min(3).max(30),
-        Email: Joi.string().lowercase().trim().email({
-          tlds: {
-            allow: false
-          }
-        }),
+        //Email: Joi.string().lowercase().trim().email({
+        // tlds: {
+        //   allow: false
+        // }
+        //}),
         NewPassword: Joi.string().min(8).max(64)
           .pattern(/^\S+$/)
           .messages({
@@ -168,7 +168,7 @@ const UserUpdate = async (req, res) => {
             'string.min': 'NewPassword must be at least 8 characters',
             'string.max': 'NewPassword must be at most 64 characters',
           }),
-        CurrentPassword: Joi.string().min(8).max(64)
+        CurrentPassword: Joi.string().min(6).max(64)
           .pattern(/^\S+$/)
           .messages({
             'string.pattern.base': 'CurrentPassword must be 8–64 chars, no spaces',
@@ -213,21 +213,21 @@ const UserUpdate = async (req, res) => {
       updates.Name = value.Name; /////
     }
 
-    if (value.Email && value.Email !== user.Email) {
-      const emailExists = await User.findOne({
-        Email: value.Email.toLowerCase().trim(),
-        _id: {
-          $ne: userId
-        },
-      });
+    // if (value.Email && value.Email !== user.Email) {
+    //   const emailExists = await User.findOne({
+    //     Email: value.Email.toLowerCase().trim(),
+    //     _id: {
+    //       $ne: userId
+    //     },
+    //   });
 
-      if (emailExists) {
-        return res.status(400).json({
-          message: "Email already in use",
-        });
-      }
-      updates.Email = value.Email.toLowerCase().trim();
-    }
+    //   if (emailExists) {
+    //     return res.status(400).json({
+    //       message: "Email already in use",
+    //     });
+    //   }
+    //   updates.Email = value.Email.toLowerCase().trim();
+    // }
 
     if (value.NewPassword) {
       // Require current password for security
@@ -369,9 +369,39 @@ const ResetPassword = async (req, res) => {
     const {
       token
     } = req.params;
+
+    const schema = Joi.object({
+      newPassword: Joi.string()
+        .min(8)
+        .max(64)
+        .pattern(/^\S+$/)
+        .required()
+        .messages({
+          "string.pattern.base": "NewPassword must be 8–64 chars, no spaces",
+          "string.min": "NewPassword must be at least 8 characters",
+          "string.max": "NewPassword must be at most 64 characters",
+          "any.required": "newPassword is required",
+        }),
+      confirmPassword: Joi.valid(Joi.ref("newPassword"))
+        .required()
+        .messages({
+          "any.only": "Passwords do not match"
+        }),
+    });
+
     const {
-      newPassword
-    } = req.body;
+      error,
+      value
+    } = schema.validate(req.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    });
+    if (error) {
+      return res.status(400).json({
+        message: "Validation error",
+        errors: error.details.map(d => d.message.replace(/"/g, "")),
+      });
+    }
 
     const user = await User.findOne({
       resetPasswordToken: token,
@@ -387,12 +417,12 @@ const ResetPassword = async (req, res) => {
     }
 
     const salt = await bcrypt.genSalt(10);
-    user.Password = await bcrypt.hash(newPassword, salt);
+    user.Password = await bcrypt.hash(value.newPassword, salt);
 
 
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
-
+    console.log(user)
     await user.save();
 
     res.status(200).json({
