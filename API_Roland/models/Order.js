@@ -18,15 +18,22 @@ const orderSchema = new schema({
       },
     },
   ],
-
   TotalPrice: {
     type: Number,
     required: true,
   },
   Status: {
     type: String,
-    enum: ["pending", "completed"],
+    enum: ["pending", "completed", "refunded", "cancelled"],
     default: "pending",
+  },
+  PaymentIntentId: {
+    type: String,
+    default: null,
+  },
+  CreatedAt: {
+    type: Date,
+    default: Date.now,
   },
 });
 
