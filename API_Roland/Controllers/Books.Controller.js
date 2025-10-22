@@ -108,6 +108,10 @@ const fs = require('fs');
  *                 type: string
  *                 format: binary
  *                 description: PDF file to upload
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *                 description: Image file to upload
  *     responses:
  *       201:
  *         description: Book created successfully
@@ -168,18 +172,40 @@ async function AddBook(req, res) {
     } = value;
 
     let pdfUrl = Pdf;
-    if (req.file) {
+    let imageUrl = Image;
+
+    if (req.files && req.files.pdf && req.files.pdf[0]) {
+      console.log("req.files.pdf:", req.files.pdf[0]);
       try {
-        const result = await cloudinary.uploader.upload(req.file.path, {
-          resource_type: "raw",
+        const result = await cloudinary.uploader.upload(req.files.pdf[0].path, {
+          resource_type: "auto",
           folder: "books/pdfs"
         });
         pdfUrl = result.secure_url;
-        fs.unlinkSync(req.file.path); // Remove local file after upload
+        fs.unlinkSync(req.files.pdf[0].path); // Remove local file after upload
       } catch (uploadError) {
-        console.error("Cloudinary upload error:", uploadError);
+        console.error("Cloudinary PDF upload error:", uploadError);
         return res.status(500).json({
-          message: "Failed to upload PDF to Cloudinary"
+          message: "Failed to upload PDF to Cloudinary",
+          error: uploadError.message
+        });
+      }
+    }
+
+    if (req.files && req.files.image && req.files.image[0]) {
+      console.log("req.files.image:", req.files.image[0]);
+      try {
+        const result = await cloudinary.uploader.upload(req.files.image[0].path, {
+          resource_type: "auto",
+          folder: "books/images"
+        });
+        imageUrl = result.secure_url;
+        fs.unlinkSync(req.files.image[0].path); // Remove local file after upload
+      } catch (uploadError) {
+        console.error("Cloudinary image upload error:", uploadError);
+        return res.status(500).json({
+          message: "Failed to upload image to Cloudinary",
+          error: uploadError.message
         });
       }
     }
@@ -211,7 +237,7 @@ async function AddBook(req, res) {
       Stock,
       Category,
       Description,
-      Image,
+      Image: imageUrl,
       Pdf: pdfUrl,
       Owner: req.user.userId,
     });

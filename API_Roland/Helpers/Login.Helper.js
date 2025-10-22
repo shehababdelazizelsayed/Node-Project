@@ -5,7 +5,7 @@ const config = require("../config/config");
 
 async function generateToken(user) {
   return jwt.sign(
-    { userId: user._id, email: user.Email, role: user.Role },
+    { userId: user._id, email: user.Email, Role: user.Role },
     config.JWT_SECRET,
     { expiresIn: config.JWT_EXPIRATION }
   );
