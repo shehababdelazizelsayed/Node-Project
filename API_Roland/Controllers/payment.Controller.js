@@ -2,7 +2,7 @@ const stripe = require("../Helpers/stripe");
 const Order = require("../models/Order");
 const Book = require("../models/Book");
 const Cart = require("../models/Cart");
-const { CheckForUser } = require("../Helpers/Login.Helper");
+const User = require("../models/User");
 const Joi = require("joi");
 const mongoose = require("mongoose");
 
@@ -12,11 +12,23 @@ async function createPaymentIntent(req, res) {
     // Get user from JWT token (set by auth middleware)
     const userId = req.user.userId;
 
+    if (!userId) {
+      return res.status(401).json({
+        message: "Authentication required",
+      });
+    }
+
     const schema = Joi.object({
       Books: Joi.array()
         .items(
           Joi.object({
-            BookId: Joi.string().trim().required(),
+            BookId: Joi.string()
+              .trim()
+              .pattern(/^[0-9a-fA-F]{24}$/)
+              .required()
+              .messages({
+                "string.pattern.base": "BookId must be a valid ObjectId",
+              }),
             Quantity: Joi.number().integer().min(1).required(),
           })
         )
@@ -38,6 +50,7 @@ async function createPaymentIntent(req, res) {
 
     const { Books } = value;
     let totalPrice = 0;
+    const bookDetails = [];
 
     // Calculate total price and validate books
     for (let i = 0; i < Books.length; i++) {
@@ -52,25 +65,42 @@ async function createPaymentIntent(req, res) {
 
       if (book.Stock < item.Quantity) {
         return res.status(400).json({
-          message: `Insufficient stock for book at index ${i}`,
+          message: `Insufficient stock for "${book.Title}". Available: ${book.Stock}, Requested: ${item.Quantity}`,
         });
       }
 
-      totalPrice += book.Price * item.Quantity;
+      const itemTotal = book.Price * item.Quantity;
+      totalPrice += itemTotal;
+
+      bookDetails.push({
+        id: book._id.toString(),
+        title: book.Title,
+        quantity: item.Quantity,
+        price: book.Price,
+      });
+    }
+
+    // Stripe requires amount in cents and minimum 50 cents
+    const amountInCents = Math.round(totalPrice * 100);
+
+    if (amountInCents < 50) {
+      return res.status(400).json({
+        message: "Total amount must be at least $0.50",
+      });
     }
 
     // Create Stripe Payment Intent
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(totalPrice * 100), // Convert to cents
+      amount: amountInCents,
       currency: "usd",
-      payment_method_types: ["card"],
       metadata: {
-        userId: userId,
+        userId: userId.toString(),
         books: JSON.stringify(Books),
+        bookDetails: JSON.stringify(bookDetails),
       },
+      payment_method_types: ["card"], // Only accept card payments
       automatic_payment_methods: {
-        enabled: true,
-        allow_redirects: "never",
+        enabled: false, // Disable automatic payment methods
       },
     });
 
@@ -79,20 +109,229 @@ async function createPaymentIntent(req, res) {
       clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
       amount: totalPrice,
+      amountInCents: amountInCents,
+      books: bookDetails,
     });
   } catch (error) {
-    console.error("createPaymentIntent:", error);
+    console.error("createPaymentIntent error:", error);
     return res.status(500).json({
-      message: error.message,
+      message: error.message || "Failed to create payment intent",
     });
   }
 }
 
-// Confirm Payment and Create Order
-async function confirmPayment(req, res) {
+// Process Payment (Confirm with Stripe and Create Order)
+async function processPayment(req, res) {
+  const session = await mongoose.startSession();
+
   try {
-    const CheckUser = await CheckForUser(req, res);
-    if (!CheckUser) return;
+    // Get user from JWT token (set by auth middleware)
+    const userId = req.user.userId;
+
+    if (!userId) {
+      return res.status(401).json({
+        message: "Authentication required",
+      });
+    }
+
+    // Get user details from database
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    const schema = Joi.object({
+      paymentIntentId: Joi.string().trim().required(),
+      paymentMethodId: Joi.string().trim().required().messages({
+        "string.empty": "Payment method is required",
+        "any.required": "Payment method is required",
+      }),
+    });
+
+    const { error, value } = schema.validate(req.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    });
+
+    if (error) {
+      return res.status(400).json({
+        message: "Validation error",
+        errors: error.details.map((d) => d.message.replace(/"/g, "")),
+      });
+    }
+
+    const { paymentIntentId, paymentMethodId } = value;
+
+    // Check if order already exists for this payment
+    const existingOrder = await Order.findOne({
+      PaymentIntentId: paymentIntentId,
+    });
+    if (existingOrder) {
+      return res.status(400).json({
+        message: "Order already created for this payment",
+        orderId: existingOrder._id,
+      });
+    }
+
+    // Confirm payment with Stripe
+    let paymentIntent;
+    try {
+      paymentIntent = await stripe.paymentIntents.confirm(paymentIntentId, {
+        payment_method: paymentMethodId,
+      });
+    } catch (stripeError) {
+      return res.status(400).json({
+        message: "Payment failed",
+        error: stripeError.message,
+      });
+    }
+
+    // Check if payment succeeded
+    if (paymentIntent.status !== "succeeded") {
+      return res.status(400).json({
+        message: "Payment not completed",
+        status: paymentIntent.status,
+        requiresAction: paymentIntent.status === "requires_action",
+        clientSecret:
+          paymentIntent.status === "requires_action"
+            ? paymentIntent.client_secret
+            : undefined,
+      });
+    }
+
+    // Parse books from metadata
+    const books = JSON.parse(paymentIntent.metadata.books);
+    const totalPrice = paymentIntent.amount / 100;
+
+    let order = null;
+
+    try {
+      await session.withTransaction(async () => {
+        // Validate and update stock
+        for (let i = 0; i < books.length; i++) {
+          const item = books[i];
+          const book = await Book.findById(item.BookId).session(session);
+
+          if (!book) {
+            throw new Error(`BOOK_NOT_FOUND_${i}`);
+          }
+
+          const qtyNum = Number(item.Quantity);
+
+          if (qtyNum < 1) {
+            throw new Error(`INVALID_QUANTITY_${i}`);
+          }
+
+          // Atomic stock update
+          const reserve = await Book.updateOne(
+            {
+              _id: item.BookId,
+              Stock: { $gte: qtyNum },
+            },
+            {
+              $inc: { Stock: -qtyNum },
+            },
+            { session }
+          );
+
+          if (reserve.matchedCount === 0 || reserve.modifiedCount === 0) {
+            throw new Error(`INSUFFICIENT_STOCK_${i}_${book.Title}`);
+          }
+        }
+
+        // Create order
+        const orderResult = await Order.create(
+          [
+            {
+              User: user._id,
+              Books: books.map((item) => ({
+                BookId: item.BookId,
+                Quantity: Number(item.Quantity),
+              })),
+              TotalPrice: totalPrice,
+              Status: "completed",
+              PaymentIntentId: paymentIntentId,
+            },
+          ],
+          { session }
+        );
+
+        order = orderResult[0];
+
+        // Clear user's cart
+        await Cart.findOneAndDelete({ User: user._id }, { session });
+      });
+
+      await session.commitTransaction();
+
+      return res.status(201).json({
+        message: "Payment confirmed and order created successfully",
+        orderId: order._id,
+        total: order.TotalPrice,
+        paymentIntentId: paymentIntentId,
+        status: order.Status,
+        paymentStatus: paymentIntent.status,
+      });
+    } catch (trxErr) {
+      await session.abortTransaction();
+
+      if (typeof trxErr.message === "string") {
+        if (trxErr.message.startsWith("BOOK_NOT_FOUND_")) {
+          const i = trxErr.message.split("_").pop();
+          return res.status(404).json({
+            message: `Book not found at index ${i}`,
+          });
+        }
+        if (trxErr.message.startsWith("INVALID_QUANTITY_")) {
+          const i = trxErr.message.split("_").pop();
+          return res.status(400).json({
+            message: `Invalid quantity at index ${i}`,
+          });
+        }
+        if (trxErr.message.startsWith("INSUFFICIENT_STOCK_")) {
+          const parts = trxErr.message.split("_");
+          const i = parts[2];
+          const bookTitle = parts.slice(3).join("_");
+          return res.status(400).json({
+            message: `Insufficient stock for "${bookTitle}" at index ${i}`,
+          });
+        }
+      }
+      throw trxErr;
+    }
+  } catch (error) {
+    console.error("processPayment error:", error);
+    return res.status(500).json({
+      message: error.message || "Failed to process payment",
+    });
+  } finally {
+    session.endSession();
+  }
+}
+
+// Confirm Payment and Create Order (for already confirmed payments)
+async function confirmPayment(req, res) {
+  const session = await mongoose.startSession();
+
+  try {
+    // Get user from JWT token (set by auth middleware)
+    const userId = req.user.userId;
+
+    if (!userId) {
+      return res.status(401).json({
+        message: "Authentication required",
+      });
+    }
+
+    // Get user details from database
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
 
     const schema = Joi.object({
       paymentIntentId: Joi.string().trim().required(),
@@ -122,12 +361,21 @@ async function confirmPayment(req, res) {
       });
     }
 
+    // Check if order already exists for this payment
+    const existingOrder = await Order.findOne({
+      PaymentIntentId: paymentIntentId,
+    });
+    if (existingOrder) {
+      return res.status(400).json({
+        message: "Order already created for this payment",
+        orderId: existingOrder._id,
+      });
+    }
+
     // Parse books from metadata
     const books = JSON.parse(paymentIntent.metadata.books);
     const totalPrice = paymentIntent.amount / 100;
 
-    // Create order using transaction
-    const session = await mongoose.startSession();
     let order = null;
 
     try {
@@ -138,11 +386,16 @@ async function confirmPayment(req, res) {
           const book = await Book.findById(item.BookId).session(session);
 
           if (!book) {
-            throw new Error(`Book not found at index ${i}`);
+            throw new Error(`BOOK_NOT_FOUND_${i}`);
           }
 
           const qtyNum = Number(item.Quantity);
 
+          if (qtyNum < 1) {
+            throw new Error(`INVALID_QUANTITY_${i}`);
+          }
+
+          // Atomic stock update
           const reserve = await Book.updateOne(
             {
               _id: item.BookId,
@@ -155,15 +408,15 @@ async function confirmPayment(req, res) {
           );
 
           if (reserve.matchedCount === 0 || reserve.modifiedCount === 0) {
-            throw new Error(`Insufficient stock for book at index ${i}`);
+            throw new Error(`INSUFFICIENT_STOCK_${i}_${book.Title}`);
           }
         }
 
         // Create order
-        order = await Order.create(
+        const orderResult = await Order.create(
           [
             {
-              User: CheckUser._id,
+              User: user._id,
               Books: books.map((item) => ({
                 BookId: item.BookId,
                 Quantity: Number(item.Quantity),
@@ -176,35 +429,61 @@ async function confirmPayment(req, res) {
           { session }
         );
 
-        order = order[0];
+        order = orderResult[0];
 
-        // Clear user's cart (optional)
-        await Cart.findOneAndDelete({ User: CheckUser._id }, { session });
+        // Clear user's cart
+        await Cart.findOneAndDelete({ User: user._id }, { session });
       });
-    } finally {
-      session.endSession();
-    }
 
-    return res.status(201).json({
-      message: "Payment confirmed and order created",
-      orderId: order._id,
-      total: order.TotalPrice,
-      paymentIntentId: paymentIntentId,
-    });
+      await session.commitTransaction();
+
+      return res.status(201).json({
+        message: "Payment confirmed and order created successfully",
+        orderId: order._id,
+        total: order.TotalPrice,
+        paymentIntentId: paymentIntentId,
+        status: order.Status,
+      });
+    } catch (trxErr) {
+      await session.abortTransaction();
+
+      if (typeof trxErr.message === "string") {
+        if (trxErr.message.startsWith("BOOK_NOT_FOUND_")) {
+          const i = trxErr.message.split("_").pop();
+          return res.status(404).json({
+            message: `Book not found at index ${i}`,
+          });
+        }
+        if (trxErr.message.startsWith("INVALID_QUANTITY_")) {
+          const i = trxErr.message.split("_").pop();
+          return res.status(400).json({
+            message: `Invalid quantity at index ${i}`,
+          });
+        }
+        if (trxErr.message.startsWith("INSUFFICIENT_STOCK_")) {
+          const parts = trxErr.message.split("_");
+          const i = parts[2];
+          const bookTitle = parts.slice(3).join("_");
+          return res.status(400).json({
+            message: `Insufficient stock for "${bookTitle}" at index ${i}`,
+          });
+        }
+      }
+      throw trxErr;
+    }
   } catch (error) {
-    console.error("confirmPayment:", error);
+    console.error("confirmPayment error:", error);
     return res.status(500).json({
-      message: error.message,
+      message: error.message || "Failed to confirm payment",
     });
+  } finally {
+    session.endSession();
   }
 }
 
 // Get Payment Intent Status
 async function getPaymentStatus(req, res) {
   try {
-    const CheckUser = await CheckForUser(req, res);
-    if (!CheckUser) return;
-
     const schema = Joi.object({
       paymentIntentId: Joi.string().trim().required(),
     });
@@ -223,15 +502,21 @@ async function getPaymentStatus(req, res) {
 
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
 
+    // Check if order exists
+    const order = await Order.findOne({ PaymentIntentId: paymentIntentId });
+
     return res.status(200).json({
-      status: paymentIntent.status,
+      paymentStatus: paymentIntent.status,
       amount: paymentIntent.amount / 100,
       currency: paymentIntent.currency,
+      orderCreated: !!order,
+      orderId: order?._id,
+      orderStatus: order?.Status,
     });
   } catch (error) {
-    console.error("getPaymentStatus:", error);
+    console.error("getPaymentStatus error:", error);
     return res.status(500).json({
-      message: error.message,
+      message: error.message || "Failed to get payment status",
     });
   }
 }
@@ -244,6 +529,7 @@ async function handleWebhook(req, res) {
   let event;
 
   try {
+    // Verify webhook signature
     event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
   } catch (err) {
     console.error("Webhook signature verification failed:", err.message);
@@ -251,34 +537,57 @@ async function handleWebhook(req, res) {
   }
 
   // Handle the event
-  switch (event.type) {
-    case "payment_intent.succeeded":
-      const paymentIntent = event.data.object;
-      console.log("PaymentIntent was successful:", paymentIntent.id);
-      // You can add additional logic here
-      break;
+  try {
+    switch (event.type) {
+      case "payment_intent.succeeded":
+        const paymentIntent = event.data.object;
+        console.log("PaymentIntent succeeded:", paymentIntent.id);
+        // Additional logic can be added here
+        break;
 
-    case "payment_intent.payment_failed":
-      const failedPayment = event.data.object;
-      console.log("PaymentIntent failed:", failedPayment.id);
-      // Handle failed payment
-      break;
+      case "payment_intent.payment_failed":
+        const failedPayment = event.data.object;
+        console.log("PaymentIntent failed:", failedPayment.id);
+        // Handle failed payment - could send email notification
+        break;
 
-    default:
-      console.log(`Unhandled event type ${event.type}`);
+      case "payment_intent.canceled":
+        const canceledPayment = event.data.object;
+        console.log("PaymentIntent canceled:", canceledPayment.id);
+        break;
+
+      default:
+        console.log(`Unhandled event type: ${event.type}`);
+    }
+
+    res.json({ received: true });
+  } catch (error) {
+    console.error("Webhook handler error:", error);
+    res.status(500).json({ error: "Webhook handler failed" });
   }
-
-  res.json({ received: true });
 }
 
 // Refund a payment
 async function refundPayment(req, res) {
   try {
-    const CheckUser = await CheckForUser(req, res);
-    if (!CheckUser) return;
+    // Get user from JWT token
+    const userId = req.user.userId;
+    if (!userId) {
+      return res.status(401).json({
+        message: "Authentication required",
+      });
+    }
+
+    // Get user details
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
 
     // Only admins can process refunds
-    if (CheckUser.Role !== "Admin" && CheckUser.Role !== "Owner") {
+    if (user.Role !== "Admin" && user.Role !== "Owner") {
       return res.status(403).json({
         message: "Access denied. Admin privileges required.",
       });
@@ -287,6 +596,7 @@ async function refundPayment(req, res) {
     const schema = Joi.object({
       paymentIntentId: Joi.string().trim().required(),
       amount: Joi.number().min(0).optional(),
+      reason: Joi.string().trim().optional(),
     });
 
     const { error, value } = schema.validate(req.body, {
@@ -301,7 +611,21 @@ async function refundPayment(req, res) {
       });
     }
 
-    const { paymentIntentId, amount } = value;
+    const { paymentIntentId, amount, reason } = value;
+
+    // Find the order
+    const order = await Order.findOne({ PaymentIntentId: paymentIntentId });
+    if (!order) {
+      return res.status(404).json({
+        message: "Order not found",
+      });
+    }
+
+    if (order.Status === "refunded") {
+      return res.status(400).json({
+        message: "Order already refunded",
+      });
+    }
 
     const refundData = {
       payment_intent: paymentIntentId,
@@ -311,30 +635,57 @@ async function refundPayment(req, res) {
       refundData.amount = Math.round(amount * 100); // Convert to cents
     }
 
+    if (reason) {
+      refundData.reason = reason;
+    }
+
+    // Process refund with Stripe
     const refund = await stripe.refunds.create(refundData);
 
     // Update order status
     await Order.findOneAndUpdate(
       { PaymentIntentId: paymentIntentId },
-      { Status: "refunded" }
+      {
+        Status: "refunded",
+        RefundId: refund.id,
+        RefundedAt: new Date(),
+      }
     );
+
+    // Restore book stock
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        for (const item of order.Books) {
+          await Book.updateOne(
+            { _id: item.BookId },
+            { $inc: { Stock: item.Quantity } },
+            { session }
+          );
+        }
+      });
+    } finally {
+      session.endSession();
+    }
 
     return res.status(200).json({
       message: "Refund processed successfully",
       refundId: refund.id,
       amount: refund.amount / 100,
       status: refund.status,
+      orderId: order._id,
     });
   } catch (error) {
-    console.error("refundPayment:", error);
+    console.error("refundPayment error:", error);
     return res.status(500).json({
-      message: error.message,
+      message: error.message || "Failed to process refund",
     });
   }
 }
 
 module.exports = {
   createPaymentIntent,
+  processPayment,
   confirmPayment,
   getPaymentStatus,
   handleWebhook,

@@ -9,7 +9,16 @@ const port = process.env.PORT || 5000;
 // Helpers & Routes
 const upload = require("./Helpers/upload");
 const uploadRoute = require("./routes/uploadRoute");
-const paymentRoutes = require("./routes/payment.js");
+
+// Import payment controller functions directly
+const {
+  createPaymentIntent,
+  processPayment,
+  confirmPayment,
+  getPaymentStatus,
+  handleWebhook,
+  refundPayment,
+} = require("./Controllers/payment.Controller");
 
 // Middleware & Controllers
 const {
@@ -56,7 +65,7 @@ const { queryBooksWithAI } = require("./Controllers/ai.controller");
 app.post(
   "/api/payment/webhook",
   express.raw({ type: "application/json" }),
-  paymentRoutes
+  handleWebhook
 );
 
 // JSON parsing for all other routes
@@ -124,10 +133,53 @@ app.get("/api/BookUsers", authMiddleware, getAllBookUsers);
 app.post("/api/ai", authMiddleware, queryBooksWithAI);
 
 // ------------------------ PAYMENT ROUTES ------------------------ //
-// Payment routes mounted after webhook
-app.use("/api/payment", paymentRoutes);
+// Create payment intent
+app.post(
+  "/api/payment/create-payment-intent",
+  authMiddleware,
+  createPaymentIntent
+);
+
+// Confirm payment and create order
+app.post("/api/payment/confirm-payment", authMiddleware, confirmPayment);
+
+// Get payment status
+app.get(
+  "/api/payment/status/:paymentIntentId",
+  authMiddleware,
+  getPaymentStatus
+);
+
+// Refund payment (Admin only)
+app.post(
+  "/api/payment/refund",
+  authMiddleware,
+  authorizeRoles("Admin", "Owner"),
+  refundPayment
+);
+app.post("/api/payment/process-payment", authMiddleware, processPayment);
+
+// ------------------------ UPLOAD ROUTE ------------------------ //
+app.use("/api", uploadRoute);
+
+// ------------------------ ERROR HANDLER ------------------------ //
+app.use((err, req, res, next) => {
+  console.error("Global error handler:", err);
+  res.status(500).json({
+    message: "Internal server error",
+    error: process.env.NODE_ENV === "development" ? err.message : undefined,
+  });
+});
+
+// ------------------------ 404 HANDLER ------------------------ //
+app.use((req, res) => {
+  res.status(404).json({
+    message: "Route not found",
+  });
+});
 
 // ------------------------ SERVER ------------------------ //
 app.listen(port, () => {
-  console.log("Server is running on port " + port);
+  console.log(`Server is running on port ${port}`);
+  console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
 });
