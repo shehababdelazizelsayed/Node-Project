@@ -2,9 +2,9 @@ const User = require("../models/User");
 const bcrypt = require("bcrypt");
 const crypto = require('crypto');
 const sendEmail = require("../utils/sendEmail");
-const {
-  CheckForUser
-} = require("../Helpers/Login.Helper");
+const { CheckForUser } = require("../Helpers/Login.Helper");
+const { logLoginActivity } = require("../utils/logger");
+const SocketManager = require("../SocketManager");
 const Joi = require('joi');
 const UserRegister = async (req, res) => {
   try {
@@ -119,18 +119,68 @@ const UserRegister = async (req, res) => {
 const UserLogin = async (req, res) => {
   try {
     const result = await CheckForUser(req, res);
-    if (!result) return;
+    if (!result) {
+      // Log failed login attempt
+      await logLoginActivity({
+        type: 'login_failed',
+        email: req.body.Email,
+        reason: 'Invalid credentials',
+        ip: req.ip
+      });
+      
+      // Broadcast failed login attempt to admins
+      SocketManager.broadcast('auth_activity', {
+        type: 'login_failed',
+        email: req.body.Email,
+        timestamp: new Date().toISOString()
+      });
+      
+      return;
+    }
 
-    const {
-      user,
-      token
-    } = result;
+    const { user, token } = result;
 
     if (!user.IsVerified) {
+      // Log unverified login attempt
+      await logLoginActivity({
+        type: 'login_failed',
+        email: user.Email,
+        reason: 'Email not verified',
+        userId: user._id,
+        ip: req.ip
+      });
+      
+      // Broadcast unverified login attempt
+      SocketManager.broadcast('auth_activity', {
+        type: 'login_failed',
+        reason: 'Email not verified',
+        email: user.Email,
+        timestamp: new Date().toISOString()
+      });
+      
       return res.status(403).json({
         message: "Please verify your email before logging in.",
       });
     }
+
+    // Log successful login
+    await logLoginActivity({
+      type: 'login_success',
+      userId: user._id,
+      email: user.Email,
+      name: user.Name,
+      role: user.Role,
+      ip: req.ip
+    });
+
+    // Broadcast login success (excluding sensitive data)
+    SocketManager.broadcast('auth_activity', {
+      type: 'login_success',
+      userId: user._id,
+      name: user.Name,
+      role: user.Role,
+      timestamp: new Date().toISOString()
+    });
 
     return res.status(200).json({
       message: "Login successful",
@@ -145,6 +195,14 @@ const UserLogin = async (req, res) => {
     });
   } catch (error) {
     console.error("Login error:", error);
+    
+    // Log error
+    await logLoginActivity({
+      type: 'login_error',
+      error: error.message,
+      ip: req.ip
+    });
+    
     return res.status(500).json({
       message: error.message,
     });
