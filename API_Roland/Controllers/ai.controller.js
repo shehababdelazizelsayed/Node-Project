@@ -1,3 +1,47 @@
+/**
+ * @swagger
+ * /api/ai:
+ *   post:
+ *     summary: Query books using AI
+ *     tags: [AI]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - query
+ *             properties:
+ *               query:
+ *                 type: string
+ *                 description: The query to ask about books
+ *     responses:
+ *       200:
+ *         description: AI response generated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 query:
+ *                   type: string
+ *                 booksAnalyzed:
+ *                   type: integer
+ *                 response:
+ *                   type: string
+ *       400:
+ *         description: Query is required
+ *       404:
+ *         description: No books found
+ *       500:
+ *         description: Internal server error
+ */
+
 const Groq = require("groq-sdk");
 const Book = require("../models/Book");
 

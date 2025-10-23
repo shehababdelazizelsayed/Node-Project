@@ -1,7 +1,137 @@
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     Book:
+ *       type: object
+ *       required:
+ *         - Title
+ *         - Author
+ *         - Price
+ *         - Description
+ *         - Category
+ *       properties:
+ *         Title:
+ *           type: string
+ *           description: Book title
+ *         Author:
+ *           type: string
+ *           description: Book author
+ *         Price:
+ *           type: number
+ *           description: Book price
+ *         Description:
+ *           type: string
+ *           description: Book description
+ *         Stock:
+ *           type: integer
+ *           description: Book stock quantity
+ *         Image:
+ *           type: string
+ *           format: uri
+ *           description: Book image URL
+ *         Category:
+ *           type: string
+ *           description: Book category
+ *         Pdf:
+ *           type: string
+ *           format: uri
+ *           description: Book PDF URL
+ *         Owner:
+ *           type: string
+ *           description: Owner user ID
+ *       example:
+ *         Title: Sample Book
+ *         Author: John Doe
+ *         Price: 29.99
+ *         Description: A great book
+ *         Stock: 10
+ *         Category: Fiction
+ *         Image: http://example.com/image.jpg
+ *         Pdf: http://example.com/pdf.pdf
+ *         Owner: userId
+ */
 const Book = require("../models/Book");
 const Joi = require('joi');
 const cloudinary = require("../Helpers/cloudinary");
 const fs = require('fs');
+
+/**
+ * @swagger
+ * /api/Books:
+ *   post:
+ *     summary: Add a new book
+ *     tags: [Books]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - Title
+ *               - Author
+ *               - Price
+ *               - Description
+ *               - Category
+ *             properties:
+ *               Title:
+ *                 type: string
+ *                 description: Book title
+ *               Author:
+ *                 type: string
+ *                 description: Book author
+ *               Price:
+ *                 type: number
+ *                 description: Book price
+ *               Description:
+ *                 type: string
+ *                 description: Book description
+ *               Stock:
+ *                 type: integer
+ *                 description: Book stock quantity
+ *               Image:
+ *                 type: string
+ *                 format: uri
+ *                 description: Book image URL
+ *               Category:
+ *                 type: string
+ *                 description: Book category
+ *               Pdf:
+ *                 type: string
+ *                 format: uri
+ *                 description: Book PDF URL (optional if file is uploaded)
+ *               pdf:
+ *                 type: string
+ *                 format: binary
+ *                 description: PDF file to upload
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *                 description: Image file to upload
+ *     responses:
+ *       201:
+ *         description: Book created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 Book:
+ *                   $ref: '#/components/schemas/Book'
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       500:
+ *         description: Internal server error
+ */
 
 // Add
 async function AddBook(req, res) {
@@ -43,21 +173,44 @@ async function AddBook(req, res) {
     } = value;
 
     let pdfUrl = Pdf;
-    if (req.file) {
+    let imageUrl = Image;
+
+    if (req.files && req.files.pdf && req.files.pdf[0]) {
+      console.log("req.files.pdf:", req.files.pdf[0]);
       try {
-        const result = await cloudinary.uploader.upload(req.file.path, {
-          resource_type: "raw",
+        const result = await cloudinary.uploader.upload(req.files.pdf[0].path, {
+          resource_type: "auto",
           folder: "books/pdfs"
         });
         pdfUrl = result.secure_url;
-        fs.unlinkSync(req.file.path); // Remove local file after upload
+        fs.unlinkSync(req.files.pdf[0].path); // Remove local file after upload
       } catch (uploadError) {
-        console.error("Cloudinary upload error:", uploadError);
+        console.error("Cloudinary PDF upload error:", uploadError);
         return res.status(500).json({
-          message: "Failed to upload PDF to Cloudinary"
+          message: "Failed to upload PDF to Cloudinary",
+          error: uploadError.message
         });
       }
     }
+
+    if (req.files && req.files.image && req.files.image[0]) {
+      console.log("req.files.image:", req.files.image[0]);
+      try {
+        const result = await cloudinary.uploader.upload(req.files.image[0].path, {
+          resource_type: "auto",
+          folder: "books/images"
+        });
+        imageUrl = result.secure_url;
+        fs.unlinkSync(req.files.image[0].path); // Remove local file after upload
+      } catch (uploadError) {
+        console.error("Cloudinary image upload error:", uploadError);
+        return res.status(500).json({
+          message: "Failed to upload image to Cloudinary",
+          error: uploadError.message
+        });
+      }
+    }
+
 
     // if (!Title || !Author || !Price || !Description || !Category) {
     //   return res.status(400).json({
@@ -104,6 +257,77 @@ async function AddBook(req, res) {
   }
 };
 
+/**
+ * @swagger
+ * /api/Books/{id}:
+ *   put:
+ *     summary: Update a book
+ *     tags: [Books]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Book ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               Title:
+ *                 type: string
+ *                 description: Book title
+ *               Author:
+ *                 type: string
+ *                 description: Book author
+ *               Price:
+ *                 type: number
+ *                 description: Book price
+ *               Description:
+ *                 type: string
+ *                 description: Book description
+ *               Stock:
+ *                 type: integer
+ *                 description: Book stock quantity
+ *               Image:
+ *                 type: string
+ *                 format: uri
+ *                 description: Book image URL
+ *               Category:
+ *                 type: string
+ *                 description: Book category
+ *               Pdf:
+ *                 type: string
+ *                 format: uri
+ *                 description: Book PDF URL
+ *     responses:
+ *       200:
+ *         description: Book updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 Book:
+ *                   $ref: '#/components/schemas/Book'
+ *       400:
+ *         description: Validation error or invalid ID
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Book not found
+ *       500:
+ *         description: Internal server error
+ */
 
 // Update
 async function UpdateBooks(req, res) {
@@ -220,6 +444,44 @@ async function UpdateBooks(req, res) {
   }
 }
 
+/**
+ * @swagger
+ * /api/Books/{id}:
+ *   delete:
+ *     summary: Delete a book
+ *     tags: [Books]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Book ID
+ *     responses:
+ *       200:
+ *         description: Book deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 Book:
+ *                   $ref: '#/components/schemas/Book'
+ *       400:
+ *         description: Invalid ID
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Book not found
+ *       500:
+ *         description: Internal server error
+ */
 
 // Delete
 async function DeleteBook(req, res) {

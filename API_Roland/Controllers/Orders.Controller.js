@@ -1,3 +1,44 @@
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     OrderItem:
+ *       type: object
+ *       properties:
+ *         BookId:
+ *           type: string
+ *           description: Book ID
+ *         Quantity:
+ *           type: integer
+ *           minimum: 1
+ *           description: Quantity ordered
+ *       required:
+ *         - BookId
+ *         - Quantity
+ *     Order:
+ *       type: object
+ *       properties:
+ *         User:
+ *           type: string
+ *           description: User ID
+ *         Books:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/OrderItem'
+ *         TotalPrice:
+ *           type: number
+ *           description: Total order price
+ *         Status:
+ *           type: string
+ *           enum: [pending, completed, cancelled]
+ *           description: Order status
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ */
 const Order = require("../models/Order")
 const {
   CheckForUser
@@ -18,6 +59,62 @@ const createOrderSchema = Joi.object({
   ).min(1).required(),
 });
 
+/**
+ * @swagger
+ * /api/Orders:
+ *   post:
+ *     summary: Create a new order
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - Books
+ *             properties:
+ *               Books:
+ *                 type: array
+ *                 minItems: 1
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - BookId
+ *                     - Quantity
+ *                   properties:
+ *                     BookId:
+ *                       type: string
+ *                       description: Book ID
+ *                     Quantity:
+ *                       type: integer
+ *                       minimum: 1
+ *                       description: Quantity to order
+ *     responses:
+ *       201:
+ *         description: Order created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 orderId:
+ *                   type: string
+ *                 total:
+ *                   type: number
+ *       400:
+ *         description: Validation error or insufficient stock
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Book not found
+ *       500:
+ *         description: Internal server error
+ */
 async function CreateOrder(req, res) {
 
 
@@ -204,6 +301,29 @@ async function CreateOrder(req, res) {
     });
   }
 }
+
+/**
+ * @swagger
+ * /api/Orders:
+ *   get:
+ *     summary: Get user's orders
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Orders retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Order'
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
+ */
 async function GetOrders(req, res) {
   try {
 

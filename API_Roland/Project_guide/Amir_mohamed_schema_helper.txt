@@ -1,0 +1,4 @@
+# We have Created a node project and install mongoose and express , then connecting the project with the mongo cluster by adding the Mongo_URI
+# And then Created models which contains all the schemas or collections we will have in our database and then exported them to be improted in the app.js file where the server will be created
+# And then tested the user adding and book adding with postman with the post method
+# Inside the Models folder you will find the schema for each collection

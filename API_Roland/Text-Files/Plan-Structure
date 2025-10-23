@@ -1,0 +1,114 @@
+BackEnd Dev :
+
+Time line 3 Days 3/10 - 6/10
+
+
+Per-person Requirement:
+
+	-Document Everything you write or did in an external Text file append what you did each day in the file and upload to github.
+	-Write a Detailed report of the functions Names and the code structure for everyone to be able to use. 
+	-Each team is Duo is required to write the error they faced and how they fixed each one.
+	-Testing will be done by all others who doesn't write the code and be documented.
+
+First Phase Teams:
+
+	(Shehab-Nada)
+		-Create Git-hub ( setup branches for each team)
+		-Initialize node and express
+		-Setup the Environment Clear up Dependencies
+		-------------------------------------------------
+		-Initialize MongoDB (Mongoose)
+		-Create Base Schema
+		-------------------------------------------------
+		-Generate JWT token and verification
+		-Password Hashing
+		-Email OTP (using nodemailer)
+		-Password Reset
+		
+	(Amir-Mohamed)
+		-DataBase Design (MongoDB + Mongoose)
+			
+		  -Required Schema for the DataBase:
+				
+			-Users:
+			
+				{
+					Name:string
+					Email:string
+					Password:string
+					Role:{Type:string,enum:["user","admin"],Default:"user"}
+					IsVerified:Boolean
+				}
+			
+			-Books:
+				{
+					Title:string
+					Author:string
+					Price:number
+					Description:String
+					Stock:Number
+					Image:string
+					Reviews:[{Type: mongoose.schema.Type.ObjectID, ref:"Review"}]
+				}
+			
+			-Orders:
+				{
+					User:[{Type: mongoose.schema.Type.ObjectID, ref:"User"}]
+					Books:[{BookID:ObjectID, Quantity:number}]
+					TotalPrice:number
+					Status:{Type: string, enum["pending","completed"],default:"pending"}
+				}
+				
+			-Cart
+				{
+					User:{Type: mongoose.schema.Type.ObjectID, ref:"User",Required:true}
+					Items:[{
+					      Book: { type: mongoose.Schema.Types.ObjectId, ref: "Book", required: true }
+					      Quantity:{type: number , default:1,min:1}
+					
+					}]
+			-Review
+				{
+					User:{Type: mongoose.schema.Type.ObjectID, ref:"User"}
+					Book:{Type: mongoose.schema.Type.ObjectID, ref:"Book"}
+					Rating:{type: number,min:1 , max:10}
+					review:{type: string , max:1000}
+					CreatedAT:{type:date, default:Date.now}
+					
+		
+	(Ahmed-Roland)
+		-CRUD operations
+			-Users:
+				-POST /api/Users/Register
+				-Post /api/Users/Login 
+				-Put /api/Users/Profile (update profile)
+				
+			-Books(only Admin Validation):
+				-Post /api/Books (Add a book)
+				-Get  /api/Books (List Books --Note: Accept validation)
+				-Put  /api/Books/id (Update book)
+				-Delete /api/Books/id 
+			-Cart:
+				-Post /api/Cart (Add book to cart)
+				-Delete /api/Cart/id (Remove book from cart)
+				-Get /api/Cart (view the cart)
+				
+			-Orders:
+				-Post /api/Orders (place Order --Note: stock decreases)
+				-Get /api/Orders (Get User Order history)
+			
+			-Reviews:
+				-Post /api/Reviews (Add a review)
+				-Get /api/Reviews/id (Get book Review)
+				-Put /api/Review/id (Update Review)
+				-Delete /api/Review/id (Delete Review)
+				
+				****Note (Each user can add only on review per book)
+				
+			-Pagination:
+				-Get /api/Books?Pagenum= 
+
+
+Id -- TestCase name -- preconditions -- steps -- test data  --- expected result -- actulal result status -- steps of reproduction
+
+1000 -- Login -- Have a username and a password -- steps{1- The url of the login page -- 2- enter username and password --- 3- click on login button} -- test@gmail.com password:test -- i am able to succesfully login --- I get the email is not vaild --

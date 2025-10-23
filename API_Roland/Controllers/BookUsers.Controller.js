@@ -1,9 +1,79 @@
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     BookUser:
+ *       type: object
+ *       properties:
+ *         _id:
+ *           type: string
+ *         Title:
+ *           type: string
+ *         Author:
+ *           type: string
+ *         Price:
+ *           type: number
+ *         Description:
+ *           type: string
+ *         Stock:
+ *           type: integer
+ *         Image:
+ *           type: string
+ *         Category:
+ *           type: string
+ *         Pdf:
+ *           type: string
+ *         Owner:
+ *           type: string
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ */
+
 const User = require("../models/User");
 const Books = require("../models/Book");
 const checkUser = require("../Helpers/Login.Helper");
 const Joi = require('joi');
 
-
+/**
+ * @swagger
+ * /api/BookUsers:
+ *   get:
+ *     summary: Get all books for users with pagination
+ *     tags: [BookUsers]
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 10
+ *         description: Number of books per page
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: Page number
+ *     responses:
+ *       200:
+ *         description: Books retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/BookUser'
+ *       400:
+ *         description: Validation error
+ *       500:
+ *         description: Internal server error
+ */
 
 
 async function getAllBookUsers(req, res) {
