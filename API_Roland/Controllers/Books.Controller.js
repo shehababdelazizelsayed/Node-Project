@@ -239,7 +239,7 @@ async function AddBook(req, res) {
       Stock,
       Category,
       Description,
-      Image,
+      Image: imageUrl, 
       Pdf: pdfUrl,
       Owner: req.user.userId,
     });

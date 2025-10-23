@@ -82,7 +82,7 @@ app.post(
   "/api/Books",
   authMiddleware,
   authorizeRoles("Owner", "Admin"),
-  upload.single("pdf"),
+  upload.fields([{ name: 'image', maxCount: 1 }, { name: 'pdf', maxCount: 1 }]),
   AddBook
 );
 app.put(
