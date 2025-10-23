@@ -8,16 +8,18 @@
 //   $env:USER_ID='alice'; node test-client.js
 
 // Ensure we can find node_modules regardless of working directory
-const path = require('path');
+const path = require("path");
 process.chdir(path.dirname(__filename));
 
 const io = require("socket.io-client");
 
 // Use authenticated user ID from login response
-const userId = "68fa29f68b7dc55268c00bb2"; // Your actual user ID from login
+const userId = "68f61a0f9b17f815a76ad3d6"; // Your actual user ID from login
 const serverUrl = process.env.SERVER_URL || "http://localhost:5000";
 
-console.log(`[Test Client] Connecting to ${serverUrl} as authenticated user (${userId})`);
+console.log(
+  `[Test Client] Connecting to ${serverUrl} as authenticated user (${userId})`
+);
 
 const socket = io(serverUrl, {
   transports: ["websocket", "polling"],
@@ -47,9 +49,13 @@ socket.on("registered", (data) => {
   console.log("\nReady to receive notifications!");
   console.log("Try these commands in another terminal:");
   console.log(`  # Broadcast to all users:`);
-  console.log(`  curl -X POST http://localhost:5000/api/notify -H "Content-Type: application/json" -d '{"event":"notification","payload":{"message":"Hello everyone!"}}'`);
+  console.log(
+    `  curl -X POST http://localhost:5000/api/notify -H "Content-Type: application/json" -d '{"event":"notification","payload":{"message":"Hello everyone!"}}'`
+  );
   console.log(`\n  # Notify just ${userId}:`);
-  console.log(`  curl -X POST http://localhost:5000/api/notify/${userId} -H "Content-Type: application/json" -d '{"event":"notification","payload":{"message":"Hello ${userId}!"}}'`);
+  console.log(
+    `  curl -X POST http://localhost:5000/api/notify/${userId} -H "Content-Type: application/json" -d '{"event":"notification","payload":{"message":"Hello ${userId}!"}}'`
+  );
 });
 
 socket.on("notification", (data) => {
