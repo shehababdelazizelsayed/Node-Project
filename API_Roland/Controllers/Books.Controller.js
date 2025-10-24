@@ -58,6 +58,7 @@ const fs = require('fs');
 const Review = require("../models/Review")
 const mongoose = require('mongoose');
 const userColl = mongoose.model('User').collection.name;
+const { getCache, setCache, deleteCache } = require("../utils/redis");
 /**
  * @swagger
  * /api/Books:
@@ -246,6 +247,9 @@ async function AddBook(req, res) {
       Owner: req.user.userId,
     });
 
+    // Invalidate cache for books list
+    await deleteCache('books:*');
+
     return res.status(201).json({
       message: "Book created successfully",
       Book: CreateBook
@@ -432,6 +436,9 @@ async function UpdateBooks(req, res) {
 
     });
 
+    // Invalidate cache for books list
+    await deleteCache('books:*');
+
     return res.status(200).json({
       message: "Book updated successfully",
       Book: updatedBook
@@ -525,6 +532,10 @@ async function DeleteBook(req, res) {
       });
     }
     const Deleted = await Book.findByIdAndDelete(id);
+
+    // Invalidate cache for books list
+    await deleteCache('books:*');
+
     return res.status(200).json({
       message: "Book deleted successfully",
       Book: Deleted
@@ -653,6 +664,17 @@ async function GetBooks(req, res) {
     }
 
     const query = value;
+
+    // Generate cache key based on query params
+    const cacheKey = `books:${JSON.stringify(query)}`;
+
+    // Check cache first
+    const cachedData = await getCache(cacheKey);
+    if (cachedData) {
+      console.log('Cache hit for books');
+      return res.status(200).json(cachedData);
+    }
+    console.log('Cache miss for books');
     const limit = query.limit;
     const page = query.page;
     const skip = (page - 1) * limit;
@@ -803,7 +825,7 @@ if (needStats) {
 }
 
 
-    return res.status(200).json({
+    const response = {
       message: "Books retrieved successfully",
       pagination: {
         page,
@@ -812,7 +834,12 @@ if (needStats) {
         pages: Math.max(1, Math.ceil(total / limit))
       },
       books: books,
-    });
+    };
+
+    // Cache the response
+    await setCache(cacheKey, response, 300); // TTL 5 minutes
+
+    return res.status(200).json(response);
   } catch (error) {
     console.error("GetBooks:", error);
     return res.status(500).json({

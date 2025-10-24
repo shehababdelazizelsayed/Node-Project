@@ -8,6 +8,7 @@ const http = require("http");
 const app = express();
 const port = 5000;
 const { swaggerUi, specs } = require("./swagger");
+const { connectRedis } = require("./utils/redis");
 
 const server = http.createServer(app);
 const SocketManager = require("./SocketManager");
@@ -18,6 +19,9 @@ try {
   console.error("Websocket failed cause", err);
   process.exit(1);
 }
+
+// Initialize Redis
+connectRedis();
 
 const uploadRoute = require("./routes/uploadRoute");
 app.use("/api", uploadRoute);
@@ -61,6 +65,10 @@ mongoose
   .catch(() => {
     console.log("Connected Failed ");
   });
+
+// Make Redis client available app-wide
+const { getClient } = require("./utils/redis");
+app.set('redis', getClient());
 
 app.use(express.json());
 
@@ -119,6 +127,62 @@ app.get("/api/BookUsers", authMiddleware, getAllBookUsers);
 // Payment routes
 const paymentRoutes = require("./routes/payment");
 app.use("/api/payment", paymentRoutes);
+
+/**
+ * @swagger
+ * /api/notify:
+ *   post:
+ *     summary: Send WebSocket notification to all connected clients
+ *     tags: [WebSocket]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - type
+ *               - message
+ *             properties:
+ *               type:
+ *                 type: string
+ *                 description: Type of notification
+ *               message:
+ *                 type: string
+ *                 description: Notification message
+ *               data:
+ *                 type: object
+ *                 description: Additional data for the notification
+ *             example:
+ *               type: "info"
+ *               message: "New book added"
+ *               data: { bookId: "123" }
+ *     responses:
+ *       200:
+ *         description: Notification sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
+ */
 
 // WebSocket notification routes
 app.post("/api/notify", authMiddleware, (req, res) => {
