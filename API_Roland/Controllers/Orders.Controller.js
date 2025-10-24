@@ -120,8 +120,8 @@ async function CreateOrder(req, res) {
 
 
   try {
-    const CheckUser = await CheckForUser(req, res);
-    if (!CheckUser) return;
+    // const CheckUser = await CheckForUser(req, res);
+    // if (!CheckUser) return;
     // const CheckCart = await Cart.findOne({ CheckUser: User._id });
     // if (!CheckCart) {
     //   return res.status(400).json({ message: "Cart is empty" });
@@ -232,7 +232,7 @@ async function CreateOrder(req, res) {
         }
         totalPrice = Number(totalPrice.toFixed(2));
         created = await Order.create([{
-          User: CheckUser._id,
+          User: req.user.userId,
           Books: body.Books.map(Item => ({
             BookId: Item.BookId,
             Quantity: Number(Item.Quantity)
@@ -327,10 +327,10 @@ async function CreateOrder(req, res) {
 async function GetOrders(req, res) {
   try {
 
-    const CheckUser = await CheckForUser(req, res);
-    if (!CheckUser) return;
+    // const CheckUser = await CheckForUser(req, res);
+    // if (!CheckUser) return;
     const UserOrders = await Order.find({
-      User: CheckUser._id
+      User: req.user.userId
     })
     res.status(200).json(UserOrders);
   } catch (error) {
