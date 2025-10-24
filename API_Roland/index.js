@@ -10,6 +10,9 @@ const port = 5000;
 const { swaggerUi, specs } = require("./swagger");
 const { connectRedis } = require("./utils/redis");
 
+const logger = require("./utils/logger");
+const errorHandler = require("./middlewares/errorHandler");
+
 const server = http.createServer(app);
 const SocketManager = require("./SocketManager");
 try {
