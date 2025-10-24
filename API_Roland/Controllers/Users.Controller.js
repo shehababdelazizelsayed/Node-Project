@@ -36,12 +36,10 @@
  */
 const User = require("../models/User");
 const bcrypt = require("bcrypt");
-const crypto = require('crypto');
+const crypto = require("crypto");
 const sendEmail = require("../utils/sendEmail");
-const {
-  CheckForUser
-} = require("../Helpers/Login.Helper");
-const Joi = require('joi');
+const { CheckForUser } = require("../Helpers/Login.Helper");
+const Joi = require("joi");
 /**
  * @swagger
  * /api/Users/Register:
@@ -93,12 +91,7 @@ const Joi = require('joi');
  */
 const UserRegister = async (req, res) => {
   try {
-    const {
-      Name,
-      Email,
-      Password,
-      Role
-    } = req.body;
+    const { Name, Email, Password, Role } = req.body;
 
     // if (!Name || !Email || !Password) {
     //   return res.status(400).json({
@@ -106,54 +99,56 @@ const UserRegister = async (req, res) => {
     //   });
     // }
     const schema = Joi.object({
-        Name: Joi.string()
-          .pattern(/^[A-Za-z0-9 ]+$/)
-          .min(3)
-          .max(30)
-          .required()
-          .messages({
-            'string.pattern.base': 'Name can contain letters, numbers, and spaces only',
-          }),
-        Password: Joi.string().required()
-          .min(8).max(64).pattern(/^\S+$/)
-          .messages({
-            'string.pattern.base': 'password can contain letters, number,  only',
-          }),
-        Email: Joi.string().required().lowercase().trim()
-          .email({
-            minDomainSegments: 2,
-            tlds: {
-              allow: ['com', 'net']
-            }
-          }),
-        Token: Joi.string(),
+      Name: Joi.string()
+        .pattern(/^[A-Za-z0-9 ]+$/)
+        .min(3)
+        .max(30)
+        .required()
+        .messages({
+          "string.pattern.base":
+            "Name can contain letters, numbers, and spaces only",
+        }),
+      Password: Joi.string()
+        .required()
+        .min(8)
+        .max(64)
+        .pattern(/^\S+$/)
+        .messages({
+          "string.pattern.base": "password can contain letters, number,  only",
+        }),
+      Email: Joi.string()
+        .required()
+        .lowercase()
+        .trim()
+        .email({
+          minDomainSegments: 2,
+          tlds: {
+            allow: ["com", "net"],
+          },
+        }),
+      Token: Joi.string(),
 
-        Role: Joi.string()
-          .valid('User', 'Admin')
-          .empty('')
-          .default('User')
-          .messages({
-            'any.only': 'Role must be User ',
-          }),
-
-      })
-      .xor('Password', 'Token')
-    const {
-      error,
-      value
-    } = schema.validate(req.body, {
+      Role: Joi.string()
+        .valid("User", "Admin")
+        .empty("")
+        .default("User")
+        .messages({
+          "any.only": "Role must be User ",
+        }),
+    }).xor("Password", "Token");
+    const { error, value } = schema.validate(req.body, {
       abortEarly: false,
-      stripUnknown: true
+      stripUnknown: true,
     });
     if (error) {
       return res.status(400).json({
-        message: 'Validation error',
-        errors: error.details.map(d => d.message.replace(/"/g, '')),
+        message: "Validation error",
+        errors: error.details.map((d) => d.message.replace(/"/g, "")),
       });
     }
 
     const existingUser = await User.findOne({
-      Email
+      Email,
     });
     if (existingUser) {
       return res.status(400).json({
@@ -169,7 +164,7 @@ const UserRegister = async (req, res) => {
       Email,
       Password: hashedPassword,
       Role: Role || "User",
-      IsVerified: false
+      IsVerified: false,
     });
 
     const verificationToken = crypto.randomBytes(32).toString("hex");
@@ -250,10 +245,7 @@ const UserLogin = async (req, res) => {
     const result = await CheckForUser(req, res);
     if (!result) return;
 
-    const {
-      user,
-      token
-    } = result;
+    const { user, token } = result;
 
     if (!user.IsVerified) {
       return res.status(403).json({
@@ -328,52 +320,44 @@ const UserLogin = async (req, res) => {
  */
 const UserUpdate = async (req, res) => {
   try {
-
     const schema = Joi.object({
-        Name: Joi.string().trim().min(3).max(30),
-        //Email: Joi.string().lowercase().trim().email({
-        // tlds: {
-        //   allow: false
-        // }
-        //}),
-        NewPassword: Joi.string().min(8).max(64)
-          .pattern(/^\S+$/)
-          .messages({
-            'string.pattern.base': 'NewPassword must be 8–64 chars, no spaces',
-            'string.min': 'NewPassword must be at least 8 characters',
-            'string.max': 'NewPassword must be at most 64 characters',
-          }),
-        CurrentPassword: Joi.string().min(6).max(64)
-          .pattern(/^\S+$/)
-          .messages({
-            'string.pattern.base': 'CurrentPassword must be 8–64 chars, no spaces',
-            'string.min': 'CurrentPassword must be at least 8 characters',
-            'string.max': 'CurrentPassword must be at most 64 characters',
-          }),
-      })
-      .with('NewPassword', 'CurrentPassword')
-      .or('Name', 'Email', 'NewPassword');
-    const {
-      error,
-      value
-    } = schema.validate(req.body, {
+      Name: Joi.string().trim().min(3).max(30),
+      //Email: Joi.string().lowercase().trim().email({
+      // tlds: {
+      //   allow: false
+      // }
+      //}),
+      NewPassword: Joi.string().min(8).max(64).pattern(/^\S+$/).messages({
+        "string.pattern.base": "NewPassword must be 8–64 chars, no spaces",
+        "string.min": "NewPassword must be at least 8 characters",
+        "string.max": "NewPassword must be at most 64 characters",
+      }),
+      CurrentPassword: Joi.string().min(6).max(64).pattern(/^\S+$/).messages({
+        "string.pattern.base": "CurrentPassword must be 8–64 chars, no spaces",
+        "string.min": "CurrentPassword must be at least 8 characters",
+        "string.max": "CurrentPassword must be at most 64 characters",
+      }),
+    })
+      .with("NewPassword", "CurrentPassword")
+      .or("Name", "Email", "NewPassword");
+    const { error, value } = schema.validate(req.body, {
       abortEarly: false,
       stripUnknown: true,
     });
 
     if (error) {
       return res.status(400).json({
-        message: 'Validation error',
-        errors: error.details.map(d => d.message.replace(/"/g, '')),
+        message: "Validation error",
+        errors: error.details.map((d) => d.message.replace(/"/g, "")),
       });
     }
     ////////////
     const userId = req.user.userId; /////
     const user = await User.findById(userId);
-    
+
     if (!userId) {
       return res.status(401).json({
-        message: 'Unauthorized'
+        message: "Unauthorized",
       });
     }
     if (!user) {
@@ -382,16 +366,14 @@ const UserUpdate = async (req, res) => {
       });
     }
 
-
     const updates = {};
     ////////
 
-    if(value.Name == user.Name){
-      return res.status(402).json(
-      {massage:"you must add New Name "}
-      )
+    if (value.Name == user.Name) {
+      return res.status(402).json({ massage: "you must add New Name " });
     }
-    if (value.Name) { //////
+    if (value.Name) {
+      //////
       updates.Name = value.Name; /////
     }
 
@@ -444,13 +426,15 @@ const UserUpdate = async (req, res) => {
 
     // Update user
     const updatedUser = await User.findByIdAndUpdate(
-      userId, {
-        $set: updates
-      }, {
+      userId,
+      {
+        $set: updates,
+      },
+      {
         new: true,
-        runValidators: true
+        runValidators: true,
       }
-    ).select('_id Name Email Role');
+    ).select("_id Name Email Role");
 
     return res.status(200).json({
       message: "Profile updated successfully",
@@ -500,20 +484,18 @@ const UserUpdate = async (req, res) => {
 // Verify Email
 const VerifyEmail = async (req, res) => {
   try {
-    const {
-      token
-    } = req.params;
+    const { token } = req.params;
 
     const user = await User.findOne({
       verificationToken: token,
       verificationExpires: {
-        $gt: Date.now()
-      }
+        $gt: Date.now(),
+      },
     });
 
     if (!user) {
       return res.status(400).json({
-        message: "Invalid or expired verification link."
+        message: "Invalid or expired verification link.",
       });
     }
 
@@ -522,12 +504,12 @@ const VerifyEmail = async (req, res) => {
     await user.save();
 
     return res.status(200).json({
-      message: "Email verified successfully!"
+      message: "Email verified successfully!",
     });
   } catch (error) {
     console.error("VerifyEmail error:", error);
     return res.status(500).json({
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -569,16 +551,14 @@ const VerifyEmail = async (req, res) => {
 // Forgot Password
 const ForgotPassword = async (req, res) => {
   try {
-    const {
-      Email
-    } = req.body;
+    const { Email } = req.body;
 
     const user = await User.findOne({
-      Email
+      Email,
     });
     if (!user) {
       return res.status(404).json({
-        message: "No user found with this email."
+        message: "No user found with this email.",
       });
     }
 
@@ -594,12 +574,12 @@ const ForgotPassword = async (req, res) => {
       `Hi ${user.Name},\n\nClick the link below to reset your password:\n${resetLink}\n\nIf you didn’t request this, ignore the email.`
     );
     res.status(200).json({
-      message: "Reset password email sent successfully."
+      message: "Reset password email sent successfully.",
     });
   } catch (error) {
     console.error("ForgotPassword error:", error);
     res.status(500).json({
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -647,9 +627,7 @@ const ForgotPassword = async (req, res) => {
 // Reset Password
 const ResetPassword = async (req, res) => {
   try {
-    const {
-      token
-    } = req.params;
+    const { token } = req.params;
 
     const schema = Joi.object({
       newPassword: Joi.string()
@@ -663,56 +641,50 @@ const ResetPassword = async (req, res) => {
           "string.max": "NewPassword must be at most 64 characters",
           "any.required": "newPassword is required",
         }),
-      confirmPassword: Joi.valid(Joi.ref("newPassword"))
-        .required()
-        .messages({
-          "any.only": "Passwords do not match"
-        }),
+      confirmPassword: Joi.valid(Joi.ref("newPassword")).required().messages({
+        "any.only": "Passwords do not match",
+      }),
     });
 
-    const {
-      error,
-      value
-    } = schema.validate(req.body, {
+    const { error, value } = schema.validate(req.body, {
       abortEarly: false,
       stripUnknown: true,
     });
     if (error) {
       return res.status(400).json({
         message: "Validation error",
-        errors: error.details.map(d => d.message.replace(/"/g, "")),
+        errors: error.details.map((d) => d.message.replace(/"/g, "")),
       });
     }
 
     const user = await User.findOne({
       resetPasswordToken: token,
       resetPasswordExpires: {
-        $gt: Date.now()
+        $gt: Date.now(),
       },
     });
 
     if (!user) {
       return res.status(400).json({
-        message: "Invalid or expired token."
+        message: "Invalid or expired token.",
       });
     }
 
     const salt = await bcrypt.genSalt(10);
     user.Password = await bcrypt.hash(value.newPassword, salt);
 
-
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
-    console.log(user)
+    console.log(user);
     await user.save();
 
     res.status(200).json({
-      message: "Password has been reset successfully."
+      message: "Password has been reset successfully.",
     });
   } catch (error) {
     console.error("ResetPassword error:", error);
     res.status(500).json({
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -723,5 +695,5 @@ module.exports = {
   UserUpdate,
   VerifyEmail,
   ForgotPassword,
-  ResetPassword
+  ResetPassword,
 };
