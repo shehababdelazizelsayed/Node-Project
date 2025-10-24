@@ -2,6 +2,7 @@ const User = require("../models/User");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const config = require("../config/config");
+const logger = require("../utils/logger");
 
 async function generateToken(user) {
   return jwt.sign({
@@ -20,12 +21,14 @@ async function CheckForUser(req, res) {
   const Password = req.body.Password || req.body.password;
 
   if (!Email) {
+    logger.warn("Email is required")
     res.status(401).json({
       message: "Email is required"
     });
     return null;
   }
   if (!Password) {
+    logger.warn("Password is required")
     res.status(401).json({
       message: "Password is required"
     });
@@ -36,6 +39,7 @@ async function CheckForUser(req, res) {
     Email
   });
   if (!user) {
+    logger.error("Invalid credentials")
     res.status(401).json({
       message: "Invalid credentials"
     });
@@ -44,6 +48,7 @@ async function CheckForUser(req, res) {
 
   const isValidPassword = await bcrypt.compare(Password, user.Password);
   if (!isValidPassword) {
+    logger.error("Invalid credentials")
     res.status(401).json({
       message: "Invalid credentials"
     });

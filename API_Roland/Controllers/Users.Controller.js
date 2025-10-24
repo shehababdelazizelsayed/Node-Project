@@ -40,6 +40,7 @@ const crypto = require("crypto");
 const sendEmail = require("../utils/sendEmail");
 const { CheckForUser } = require("../Helpers/Login.Helper");
 const Joi = require("joi");
+const logger = require("../utils/logger");
 /**
  * @swagger
  * /api/Users/Register:
@@ -89,15 +90,11 @@ const Joi = require("joi");
  *       500:
  *         description: Internal server error
  */
+
 const UserRegister = async (req, res) => {
   try {
     const { Name, Email, Password, Role } = req.body;
 
-    // if (!Name || !Email || !Password) {
-    //   return res.status(400).json({
-    //     message: "Name, Email and Password are required",
-    //   });
-    // }
     const schema = Joi.object({
       Name: Joi.string()
         .pattern(/^[A-Za-z0-9 ]+$/)
@@ -114,46 +111,45 @@ const UserRegister = async (req, res) => {
         .max(64)
         .pattern(/^\S+$/)
         .messages({
-          "string.pattern.base": "password can contain letters, number,  only",
+          "string.pattern.base": "Password can contain letters, numbers only",
         }),
       Email: Joi.string()
         .required()
         .lowercase()
         .trim()
-        .email({
-          minDomainSegments: 2,
-          tlds: {
-            allow: ["com", "net"],
-          },
-        }),
+        .email({ minDomainSegments: 2, tlds: { allow: ["com", "net"] } }),
       Token: Joi.string(),
-
       Role: Joi.string()
         .valid("User", "Admin")
         .empty("")
         .default("User")
-        .messages({
-          "any.only": "Role must be User ",
-        }),
+        .messages({ "any.only": "Role must be User or Admin" }),
     }).xor("Password", "Token");
+
     const { error, value } = schema.validate(req.body, {
       abortEarly: false,
       stripUnknown: true,
     });
+
     if (error) {
+      logger.warn("Registration validation failed", {
+        body: req.body,
+        errors: error.details.map(d => d.message.replace(/"/g, "")),
+        path: req.originalUrl,
+      });
       return res.status(400).json({
         message: "Validation error",
-        errors: error.details.map((d) => d.message.replace(/"/g, "")),
+        errors: error.details.map(d => d.message.replace(/"/g, "")),
       });
     }
 
-    const existingUser = await User.findOne({
-      Email,
-    });
+    const existingUser = await User.findOne({ Email });
     if (existingUser) {
-      return res.status(400).json({
-        message: "Email already registered",
+      logger.warn("Registration failed: Email already registered", {
+        email: Email,
+        path: req.originalUrl,
       });
+      return res.status(400).json({ message: "Email already registered" });
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -179,22 +175,28 @@ const UserRegister = async (req, res) => {
       `Hello ${user.Name},\n\nPlease verify your email by clicking the link below:\n${verifyLink}\n\nThanks!`
     );
 
+    logger.info("User registered successfully", {
+      userId: user._id,
+      email: user.Email,
+      role: user.Role,
+      path: req.originalUrl,
+    });
+
     return res.status(201).json({
       message: "Registration successful",
-      user: {
-        id: user._id,
-        Name: user.Name,
-        Email: user.Email,
-        Role: user.Role,
-      },
+      user: { id: user._id, Name: user.Name, Email: user.Email, Role: user.Role },
     });
   } catch (error) {
-    console.error("Registration error:", error);
-    return res.status(500).json({
-      message: error.message,
+    logger.error("Registration error", {
+      error: error.message,
+      stack: error.stack,
+      body: req.body,
+      path: req.originalUrl,
     });
+    return res.status(500).json({ message: error.message });
   }
 };
+
 /**
  * @swagger
  * /api/Users/Login:
@@ -240,6 +242,7 @@ const UserRegister = async (req, res) => {
  *       500:
  *         description: Internal server error
  */
+
 const UserLogin = async (req, res) => {
   try {
     const result = await CheckForUser(req, res);
@@ -248,10 +251,22 @@ const UserLogin = async (req, res) => {
     const { user, token } = result;
 
     if (!user.IsVerified) {
+      logger.warn("Login attempt with unverified email", {
+        userId: user._id,
+        email: user.Email,
+        path: req.originalUrl,
+      });
       return res.status(403).json({
         message: "Please verify your email before logging in.",
       });
     }
+
+    logger.info("User logged in successfully", {
+      userId: user._id,
+      email: user.Email,
+      role: user.Role,
+      path: req.originalUrl,
+    });
 
     return res.status(200).json({
       message: "Login successful",
@@ -265,12 +280,19 @@ const UserLogin = async (req, res) => {
       token,
     });
   } catch (error) {
-    console.error("Login error:", error);
+    logger.error("Login error", {
+      error: error.message,
+      stack: error.stack,
+      body: req.body,
+      path: req.originalUrl,
+    });
     return res.status(500).json({
       message: error.message,
     });
   }
 };
+
+
 /**
  * @swagger
  * /api/Users/Update:
@@ -318,15 +340,12 @@ const UserLogin = async (req, res) => {
  *       500:
  *         description: Internal server error
  */
+
+
 const UserUpdate = async (req, res) => {
   try {
     const schema = Joi.object({
       Name: Joi.string().trim().min(3).max(30),
-      //Email: Joi.string().lowercase().trim().email({
-      // tlds: {
-      //   allow: false
-      // }
-      //}),
       NewPassword: Joi.string().min(8).max(64).pattern(/^\S+$/).messages({
         "string.pattern.base": "NewPassword must be 8–64 chars, no spaces",
         "string.min": "NewPassword must be at least 8 characters",
@@ -340,101 +359,86 @@ const UserUpdate = async (req, res) => {
     })
       .with("NewPassword", "CurrentPassword")
       .or("Name", "Email", "NewPassword");
+
     const { error, value } = schema.validate(req.body, {
       abortEarly: false,
       stripUnknown: true,
     });
 
     if (error) {
+      logger.warn("User update validation error", {
+        body: req.body,
+        errors: error.details.map((d) => d.message),
+        userId: req.user.userId,
+        path: req.originalUrl,
+      });
       return res.status(400).json({
         message: "Validation error",
         errors: error.details.map((d) => d.message.replace(/"/g, "")),
       });
     }
-    ////////////
-    const userId = req.user.userId; /////
+
+    const userId = req.user.userId;
     const user = await User.findById(userId);
 
-    if (!userId) {
-      return res.status(401).json({
-        message: "Unauthorized",
+    if (!userId || !user) {
+      logger.warn("Unauthorized user update attempt", {
+        userId,
+        path: req.originalUrl,
       });
-    }
-    if (!user) {
       return res.status(401).json({
-        message: "User not found",
+        message: user ? "Unauthorized" : "User not found",
       });
     }
 
     const updates = {};
-    ////////
 
     if (value.Name == user.Name) {
-      return res.status(402).json({ massage: "you must add New Name " });
-    }
-    if (value.Name) {
-      //////
-      updates.Name = value.Name; /////
+      return res.status(402).json({ message: "You must provide a new Name" });
     }
 
-    // if (value.Email && value.Email !== user.Email) {
-    //   const emailExists = await User.findOne({
-    //     Email: value.Email.toLowerCase().trim(),
-    //     _id: {
-    //       $ne: userId
-    //     },
-    //   });
-
-    //   if (emailExists) {
-    //     return res.status(400).json({
-    //       message: "Email already in use",
-    //     });
-    //   }
-    //   updates.Email = value.Email.toLowerCase().trim();
-    // }
+    if (value.Name) updates.Name = value.Name;
 
     if (value.NewPassword) {
-      // Require current password for security
       if (!value.CurrentPassword) {
         return res.status(400).json({
           message: "Current password is required to change password",
         });
       }
 
-      // Verify current password
       const isValidPassword = await bcrypt.compare(
         value.CurrentPassword,
         user.Password
       );
       if (!isValidPassword) {
+        logger.warn("User provided incorrect current password", {
+          userId,
+          path: req.originalUrl,
+        });
         return res.status(401).json({
           message: "Current password is incorrect",
         });
       }
 
-      // Hash new password
       const salt = await bcrypt.genSalt(10);
       updates.Password = await bcrypt.hash(value.NewPassword, salt);
     }
 
-    // Check if there are any updates
     if (Object.keys(updates).length === 0) {
-      return res.status(400).json({
-        message: "No fields to update",
-      });
+      return res.status(400).json({ message: "No fields to update" });
     }
 
-    // Update user
     const updatedUser = await User.findByIdAndUpdate(
       userId,
-      {
-        $set: updates,
-      },
-      {
-        new: true,
-        runValidators: true,
-      }
+      { $set: updates },
+      { new: true, runValidators: true }
     ).select("_id Name Email Role");
+
+    logger.info("User profile updated successfully", {
+      userId,
+      updatedFields: Object.keys(updates),
+      path: req.originalUrl,
+    });
 
     return res.status(200).json({
       message: "Profile updated successfully",
@@ -446,10 +450,14 @@ const UserUpdate = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("UserUpdate:", error);
-    return res.status(500).json({
-      message: error.message,
+    logger.error("UserUpdate error", {
+      error: error.message,
+      stack: error.stack,
+      userId: req.user.userId,
+      body: req.body,
+      path: req.originalUrl,
     });
+    return res.status(500).json({ message: error.message });
   }
 };
 
@@ -481,6 +489,7 @@ const UserUpdate = async (req, res) => {
  *       500:
  *         description: Internal server error
  */
+
 // Verify Email
 const VerifyEmail = async (req, res) => {
   try {
@@ -488,12 +497,14 @@ const VerifyEmail = async (req, res) => {
 
     const user = await User.findOne({
       verificationToken: token,
-      verificationExpires: {
-        $gt: Date.now(),
-      },
+      verificationExpires: { $gt: Date.now() },
     });
 
     if (!user) {
+      logger.warn("Invalid or expired verification link", {
+        token,
+        path: req.originalUrl,
+      });
       return res.status(400).json({
         message: "Invalid or expired verification link.",
       });
@@ -503,16 +514,28 @@ const VerifyEmail = async (req, res) => {
     user.verificationToken = undefined;
     await user.save();
 
+    logger.info("Email verified successfully", {
+      userId: user._id,
+      email: user.Email,
+      path: req.originalUrl,
+    });
+
     return res.status(200).json({
       message: "Email verified successfully!",
     });
   } catch (error) {
-    console.error("VerifyEmail error:", error);
+    logger.error("VerifyEmail error", {
+      error: error.message,
+      stack: error.stack,
+      token: req.params.token,
+      path: req.originalUrl,
+    });
     return res.status(500).json({
       message: error.message,
     });
   }
 };
+
 
 /**
  * @swagger
@@ -548,15 +571,19 @@ const VerifyEmail = async (req, res) => {
  *       500:
  *         description: Internal server error
  */
+
+
 // Forgot Password
 const ForgotPassword = async (req, res) => {
   try {
     const { Email } = req.body;
 
-    const user = await User.findOne({
-      Email,
-    });
+    const user = await User.findOne({ Email });
     if (!user) {
+      logger.warn("ForgotPassword: No user found with this email", {
+        email: Email,
+        path: req.originalUrl,
+      });
       return res.status(404).json({
         message: "No user found with this email.",
       });
@@ -573,11 +600,23 @@ const ForgotPassword = async (req, res) => {
       "Reset your password",
       `Hi ${user.Name},\n\nClick the link below to reset your password:\n${resetLink}\n\nIf you didn’t request this, ignore the email.`
     );
+
+    logger.info("ForgotPassword: Reset email sent", {
+      userId: user._id,
+      email: user.Email,
+      path: req.originalUrl,
+    });
+
     res.status(200).json({
       message: "Reset password email sent successfully.",
     });
   } catch (error) {
-    console.error("ForgotPassword error:", error);
+    logger.error("ForgotPassword error", {
+      error: error.message,
+      stack: error.stack,
+      body: req.body,
+      path: req.originalUrl,
+    });
     res.status(500).json({
       message: error.message,
     });
@@ -624,6 +663,8 @@ const ForgotPassword = async (req, res) => {
  *       500:
  *         description: Internal server error
  */
+
+
 // Reset Password
 const ResetPassword = async (req, res) => {
   try {
@@ -651,6 +692,11 @@ const ResetPassword = async (req, res) => {
       stripUnknown: true,
     });
     if (error) {
+      logger.warn("ResetPassword: Validation failed", {
+        errors: error.details.map((d) => d.message.replace(/"/g, "")),
+        path: req.originalUrl,
+        body: req.body,
+      });
       return res.status(400).json({
         message: "Validation error",
         errors: error.details.map((d) => d.message.replace(/"/g, "")),
@@ -659,12 +705,14 @@ const ResetPassword = async (req, res) => {
 
     const user = await User.findOne({
       resetPasswordToken: token,
-      resetPasswordExpires: {
-        $gt: Date.now(),
-      },
+      resetPasswordExpires: { $gt: Date.now() },
     });
 
     if (!user) {
+      logger.warn("ResetPassword: Invalid or expired token", {
+        token,
+        path: req.originalUrl,
+      });
       return res.status(400).json({
         message: "Invalid or expired token.",
       });
@@ -675,19 +723,34 @@ const ResetPassword = async (req, res) => {
 
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
-    console.log(user);
+
     await user.save();
+
+    logger.info("ResetPassword: Password reset successfully", {
+      userId: user._id,
+      path: req.originalUrl,
+    });
 
     res.status(200).json({
       message: "Password has been reset successfully.",
     });
   } catch (error) {
-    console.error("ResetPassword error:", error);
+    logger.error("ResetPassword error", {
+      error: error.message,
+      stack: error.stack,
+      body: req.body,
+      path: req.originalUrl,
+    });
     res.status(500).json({
       message: error.message,
     });
   }
 };
+
+
+
+
+
 
 module.exports = {
   UserLogin,

@@ -34,6 +34,7 @@
 const Review = require("../models/Review")
 const Joi = require('joi');
 const Book = require("../models/Book");
+const logger = require("../utils/logger");
 const {
   CheckForUser
 } = require("../Helpers/Login.Helper");
@@ -95,65 +96,56 @@ const {
  *       500:
  *         description: Internal server error
  */
+
+
 async function CreateReview(req, res) {
   try {
-
-    // const CheckUser = await CheckForUser(req, res);
-    // if (!CheckUser) return;
     const schema = Joi.object({
-      BookId: Joi.string().hex().length(24).required()
-        .messages({
-          'string.length': 'BookId must be 24 hex chars'
-        }),
-      Rating: Joi.number().integer().min(1).max(10).required()
-        .messages({
-          'number.base': 'Rating must be a number',
-          'number.integer': 'Rating must be an integer'
-        }),
-      Review: Joi.string().trim().max(1000).allow('', null).default(''),
+      BookId: Joi.string().hex().length(24).required().messages({
+        "string.length": "BookId must be 24 hex chars",
+      }),
+      Rating: Joi.number().integer().min(1).max(10).required().messages({
+        "number.base": "Rating must be a number",
+        "number.integer": "Rating must be an integer",
+      }),
+      Review: Joi.string().trim().max(1000).allow("", null).default(""),
     });
 
-
-    const {
-      error,
-      value
-    } = schema.validate(req.body, {
+    const { error, value } = schema.validate(req.body, {
       abortEarly: false,
       stripUnknown: true,
     });
 
     if (error) {
+      logger.warn(
+        `Validation error in CreateReview: ${error.details
+          .map((d) => d.message)
+          .join(", ")}`
+      );
       return res.status(400).json({
-        message: 'Validation error',
-        errors: error.details.map(d => d.message.replace(/"/g, '')),
+        message: "Validation error",
+        errors: error.details.map((d) => d.message.replace(/"/g, "")),
       });
     }
 
-
-    const {
-      BookId,
-      Rating,
-      Review: ReviewTextFromBody
-    } = value;
-
+    const { BookId, Rating, Review: ReviewTextFromBody } = value;
 
     if (BookId === undefined || BookId === null) {
-      return res.status(400).json({
-        message: "BookId is required"
-      });
+      logger.warn("BookId missing in CreateReview");
+      return res.status(400).json({ message: "BookId is required" });
     }
-
 
     if (Rating === undefined || Rating === null) {
-      return res.status(400).json({
-        message: "Rating is required"
-      });
+      logger.warn("Rating missing in CreateReview");
+      return res.status(400).json({ message: "Rating is required" });
     }
+
     const RatingNum = Number(Rating);
     if (!Number.isInteger(RatingNum) || RatingNum < 1 || RatingNum > 10) {
-      return res.status(400).json({
-        message: "Rating must be an integer between 1 and 10"
-      });
+      logger.warn(`Invalid rating value: ${RatingNum}`);
+      return res
+        .status(400)
+        .json({ message: "Rating must be an integer between 1 and 10" });
     }
 
     let ReviewText = "";
@@ -162,58 +154,53 @@ async function CreateReview(req, res) {
       ReviewText = String(ReviewTextFromBody).trim();
 
       if (ReviewText.length > 1000) {
-        return res.status(400).json({
-          message: "Review must be at most 1000 characters"
-        });
+        logger.warn("Review text exceeds 1000 characters");
+        return res
+          .status(400)
+          .json({ message: "Review must be at most 1000 characters" });
       }
     }
 
-
-    const foundBook = await Book.findById(BookId).select({
-      _id: 1
-    });
+    const foundBook = await Book.findById(BookId).select({ _id: 1 });
     if (!foundBook) {
-      return res.status(404).json({
-        message: "Book not found"
-      });
+      logger.warn(`Book not found for ID: ${BookId}`);
+      return res.status(404).json({ message: "Book not found" });
     }
-
 
     const exists = await Review.findOne({
       User: req.user.userId,
-      Book: BookId
+      Book: BookId,
     });
     if (exists) {
-      return res.status(409).json({
-        message: "You have already reviewed this book"
-      });
+      logger.warn(
+        `Duplicate review attempt by user ${req.user.userId} for book ${BookId}`
+      );
+      return res
+        .status(409)
+        .json({ message: "You have already reviewed this book" });
     }
-
 
     const created = await Review.create({
       User: req.user.userId,
       Book: BookId,
       Rating: RatingNum,
-      Review: ReviewText
-
+      Review: ReviewText,
     });
 
+    logger.info(
+      `Review created successfully  | User: ${req.user.userId} | Book: ${BookId} | Rating: ${RatingNum}`
+    );
 
     return res.status(201).json({
       message: "Review added successfully",
       reviewId: created._id,
       bookId: String(BookId),
-      rating: created.Rating
+      rating: created.Rating,
     });
-
-
   } catch (error) {
-    console.error("CreateReview:", error);
-    res.status(500).json({
-      message: error.message
-    });
+    logger.error(`CreateReview error: ${error.message}`);
+    res.status(500).json({ message: error.message });
   }
-
 }
 /**
  * @swagger
@@ -246,48 +233,40 @@ async function CreateReview(req, res) {
  *       500:
  *         description: Internal server error
  */
+
+
 async function GetBookReviews(req, res) {
   try {
-    // const CheckUser = await CheckForUser(req, res);
-    // if (!CheckUser) return;
     const schema = Joi.object({
-      id: Joi.string().hex().length(24).required()
+      id: Joi.string().hex().length(24).required(),
     });
-    const {
-      error,
-      value
-    } = schema.validate(req.params, {
+
+    const { error, value } = schema.validate(req.params, {
       abortEarly: false,
-      stripUnknown: true
+      stripUnknown: true,
     });
 
     if (error) {
-      return res.status(400).json({
-        message: 'Book id is required'
-      });
+      logger.warn(`GetBookReviews validation failed`, { params: req.params });
+      return res.status(400).json({ message: "Book id is required" });
     }
 
     const BookId = value.id;
     if (!BookId) {
-      return res.status(400).json({
-        message: "Book id is required"
-      });
+      logger.warn("Book id missing in GetBookReviews");
+      return res.status(400).json({ message: "Book id is required" });
     }
 
-    const reviews = await Review.find({
-      Book: BookId
-    });
+    const reviews = await Review.find({ Book: BookId });
+
+    logger.info(`Fetched ${reviews.length} review(s) for Book: ${BookId}`);
+
     return res.status(200).json(reviews);
   } catch (error) {
-    console.error("GetBookReviews:", error);
-    res.status(500).json({
-      message: error.message
-    });
+    logger.error(`GetBookReviews error: ${error.message}`, { stack: error.stack });
+    res.status(500).json({ message: error.message });
   }
-
-
 }
-
 /**
  * @swagger
  * /api/Reviews/{id}:
@@ -349,41 +328,41 @@ async function GetBookReviews(req, res) {
  *       500:
  *         description: Internal server error
  */
+
 async function EditReview(req, res) {
   try {
-    // const CheckUser = await CheckForUser(req, res);
-    // if (!CheckUser) return;
     const paramsSchema = Joi.object({
-      id: Joi.string().hex().length(24).required()
+      id: Joi.string().hex().length(24).required(),
     });
     const vParams = paramsSchema.validate(req.params, {
       abortEarly: false,
-      stripUnknown: true
+      stripUnknown: true,
     });
     if (vParams.error) {
-      return res.status(400).json({
-        message: 'Review id is required'
-      });
+      logger.warn("EditReview validation failed for params", { params: req.params });
+      return res.status(400).json({ message: "Review id is required" });
     }
+
     const ReviewData = vParams.value.id;
 
     if (!ReviewData) {
-      return res.status(400).json({
-        message: "Review id is required"
-      });
+      logger.warn("EditReview missing Review id");
+      return res.status(400).json({ message: "Review id is required" });
     }
+
     const bodySchema = Joi.object({
       Rating: Joi.number().integer().min(1).max(10),
       Review: Joi.string().trim().max(1000),
-    }).or('Rating', 'Review');
+    }).or("Rating", "Review");
 
     const vBody = bodySchema.validate(req.body, {
       abortEarly: false,
-      stripUnknown: true
+      stripUnknown: true,
     });
     if (vBody.error) {
+      logger.warn("EditReview validation failed for body", { body: req.body });
       return res.status(400).json({
-        message: 'Nothing to update (provide Rating and/or Review)'
+        message: "Nothing to update (provide Rating and/or Review)",
       });
     }
 
@@ -394,29 +373,29 @@ async function EditReview(req, res) {
     const HasText = UpdateReview !== undefined && UpdateReview !== null;
 
     if (!HasRating && !HasText) {
+      logger.warn("EditReview called with no update fields", { userId: req.user.userId });
       return res.status(400).json({
-        message: "Nothing to update (provide Rating and/or Review)"
+        message: "Nothing to update (provide Rating and/or Review)",
       });
     }
 
     const CheckId = await Review.findById(ReviewData);
     if (!CheckId) {
-      return res.status(404).json({
-        message: "Review not found"
-      });
+      logger.warn("EditReview review not found", { reviewId: ReviewData });
+      return res.status(404).json({ message: "Review not found" });
     }
 
     if (String(CheckId.User) !== String(req.user.userId)) {
-      return res.status(403).json({
-        message: "Not allowed to update this review"
-      });
+      logger.warn("EditReview unauthorized attempt", { userId: req.user.userId, reviewId: ReviewData });
+      return res.status(403).json({ message: "Not allowed to update this review" });
     }
 
     if (HasRating) {
       const RatingNum = Number(UpdateRating);
       if (!Number.isInteger(RatingNum) || RatingNum < 1 || RatingNum > 10) {
+        logger.warn("EditReview invalid rating", { rating: UpdateRating });
         return res.status(400).json({
-          message: "Rating must be an integer between 1 and 10"
+          message: "Rating must be an integer between 1 and 10",
         });
       }
       CheckId.Rating = RatingNum;
@@ -425,8 +404,9 @@ async function EditReview(req, res) {
     if (HasText) {
       let ReviewText = String(UpdateReview).trim();
       if (ReviewText.length > 1000) {
+        logger.warn("EditReview review text too long", { length: ReviewText.length });
         return res.status(400).json({
-          message: "Review must be at most 1000 characters"
+          message: "Review must be at most 1000 characters",
         });
       }
       CheckId.Review = ReviewText;
@@ -434,19 +414,21 @@ async function EditReview(req, res) {
 
     await CheckId.save();
 
+    logger.info("Review updated successfully", { userId: req.user.userId, reviewId: ReviewData });
+
     return res.status(200).json({
       message: "Review updated successfully",
       reviewId: CheckId._id,
       rating: CheckId.Rating,
-      review: CheckId.Review
+      review: CheckId.Review,
     });
   } catch (error) {
-    console.error("EditReview:", error);
-    return res.status(500).json({
-      message: error.message
-    });
+    logger.error("EditReview error", { error: error.message, stack: error.stack });
+    return res.status(500).json({ message: error.message });
   }
 }
+
+
 /**
  * @swagger
  * /api/Reviews/{id}:
@@ -483,65 +465,59 @@ async function EditReview(req, res) {
  *       500:
  *         description: Internal server error
  */
+
+
 async function DeleteReview(req, res) {
   try {
-    // const CheckUser = await CheckForUser(req, res);
-    // if (!CheckUser) return;
     const schema = Joi.object({
-      id: Joi.string().hex().length(24).required()
+      id: Joi.string().hex().length(24).required(),
     });
-    const {
-      error,
-      value
-    } = schema.validate(req.params, {
+    const { error, value } = schema.validate(req.params, {
       abortEarly: false,
-      stripUnknown: true
+      stripUnknown: true,
     });
     if (error) {
-      return res.status(400).json({
-        message: 'Review id is required'
-      });
+      logger.warn("DeleteReview validation failed for params", { params: req.params });
+      return res.status(400).json({ message: "Review id is required" });
     }
+
     const ReviewData = value.id;
     if (!ReviewData) {
-      return res.status(400).json({
-        message: "Review id is required"
-      });
+      logger.warn("DeleteReview missing Review id");
+      return res.status(400).json({ message: "Review id is required" });
     }
+
     const CheckId = await Review.findById(ReviewData);
     if (!CheckId) {
-      return res.status(404).json({
-        message: "Review not found"
-      });
+      logger.warn("DeleteReview review not found", { reviewId: ReviewData });
+      return res.status(404).json({ message: "Review not found" });
     }
 
-    if (String(CheckId.User) !== String(req.user.userId) && req.user.Role !== 'Admin') {
-      return res.status(403).json({
-        message: "Not allowed to delete this review"
-      });
+    if (String(CheckId.User) !== String(req.user.userId) && req.user.Role !== "Admin") {
+      logger.warn("DeleteReview unauthorized attempt", { userId: req.user.userId, reviewId: ReviewData });
+      return res.status(403).json({ message: "Not allowed to delete this review" });
     }
-    const Deleted = await Review.findByIdAndDelete(ReviewData)
+
+    const Deleted = await Review.findByIdAndDelete(ReviewData);
     if (!Deleted) {
-      return res.status(404).json({
-        message: "Review not found"
-      });
+      logger.warn("DeleteReview not found during deletion", { reviewId: ReviewData });
+      return res.status(404).json({ message: "Review not found" });
     }
+
+    logger.info("Review deleted successfully", { userId: req.user.userId, reviewId: ReviewData });
+
     return res.status(200).json({
-      message: "Review deleted successfully"
+      message: "Review deleted successfully",
     });
   } catch (error) {
-    console.error("DeleteReview", error)
-    return res.status(500).json({
-      message: error.message
-    });
-
+    logger.error("DeleteReview error", { error: error.message, stack: error.stack });
+    return res.status(500).json({ message: error.message });
   }
 }
-
 
 module.exports = {
   CreateReview,
   GetBookReviews,
   EditReview,
-  DeleteReview
-}
+  DeleteReview,
+};

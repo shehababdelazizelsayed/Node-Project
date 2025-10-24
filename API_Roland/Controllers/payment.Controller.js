@@ -5,6 +5,7 @@ const User = require("../models/User");
 const Joi = require("joi");
 const mongoose = require("mongoose");
 const SocketManager = require("../SocketManager");
+const logger = require("../utils/logger");
 
 // Create Payment Intent
 async function createPaymentIntent(req, res) {
@@ -12,6 +13,7 @@ async function createPaymentIntent(req, res) {
     const userId = req.user.userId;
 
     if (!userId) {
+      logger.warn("Unauthorized attempt to create payment intent ");
       return res.status(401).json({
         message: "Authentication required",
       });
@@ -41,6 +43,7 @@ async function createPaymentIntent(req, res) {
     });
 
     if (error) {
+      logger.warn(`Validation error in createPaymentIntent: ${error.details.map(d => d.message).join(", ")}`);
       return res.status(400).json({
         message: "Validation error",
         errors: error.details.map((d) => d.message.replace(/"/g, "")),
@@ -53,15 +56,17 @@ async function createPaymentIntent(req, res) {
 
     for (let i = 0; i < Books.length; i++) {
       const item = Books[i];
-
       const book = await Book.findById(item.BookId);
+
       if (!book) {
+        logger.warn(`Book not found at index ${i}`);
         return res.status(404).json({
           message: `Book not found at index ${i}`,
         });
       }
 
       if (book.Stock < item.Quantity) {
+        logger.warn(`Insufficient stock for "${book.Title}"`);
         return res.status(400).json({
           message: `Insufficient stock for "${book.Title}". Available: ${book.Stock}, Requested: ${item.Quantity}`,
         });
@@ -81,6 +86,7 @@ async function createPaymentIntent(req, res) {
     const amountInCents = Math.round(totalPrice * 100);
 
     if (amountInCents < 50) {
+      logger.warn("Attempted payment below minimum amount");
       return res.status(400).json({
         message: "Total amount must be at least $0.50",
       });
@@ -100,6 +106,10 @@ async function createPaymentIntent(req, res) {
       },
     });
 
+    logger.info(
+      `Payment intent created successfully for user ${userId} 💳 | Amount: $${totalPrice}`
+    );
+
     return res.status(200).json({
       message: "Payment intent created successfully",
       clientSecret: paymentIntent.client_secret,
@@ -109,12 +119,13 @@ async function createPaymentIntent(req, res) {
       books: bookDetails,
     });
   } catch (error) {
-    console.error("createPaymentIntent error:", error);
+    logger.error(`createPaymentIntent error: ${error.message} `);
     return res.status(500).json({
       message: error.message || "Failed to create payment intent",
     });
   }
 }
+
 
 // Process Payment (Confirm with Stripe and Create Order)
 async function processPayment(req, res) {
@@ -124,6 +135,7 @@ async function processPayment(req, res) {
     const userId = req.user.userId;
 
     if (!userId) {
+      logger.warn("Unauthorized attempt to process payment ");
       return res.status(401).json({
         message: "Authentication required",
       });
@@ -131,6 +143,7 @@ async function processPayment(req, res) {
 
     const user = await User.findById(userId);
     if (!user) {
+      logger.warn(`User not found with ID: ${userId}`);
       return res.status(404).json({
         message: "User not found",
       });
@@ -150,6 +163,11 @@ async function processPayment(req, res) {
     });
 
     if (error) {
+      logger.warn(
+        `Validation error in processPayment: ${error.details
+          .map((d) => d.message)
+          .join(", ")}`
+      );
       return res.status(400).json({
         message: "Validation error",
         errors: error.details.map((d) => d.message.replace(/"/g, "")),
@@ -162,6 +180,9 @@ async function processPayment(req, res) {
       PaymentIntentId: paymentIntentId,
     });
     if (existingOrder) {
+      logger.warn(
+        `Duplicate payment attempt for intent ${paymentIntentId} by user ${userId}`
+      );
       return res.status(400).json({
         message: "Order already created for this payment",
         orderId: existingOrder._id,
@@ -173,7 +194,13 @@ async function processPayment(req, res) {
       paymentIntent = await stripe.paymentIntents.confirm(paymentIntentId, {
         payment_method: paymentMethodId,
       });
+      logger.info(
+        `Payment intent ${paymentIntentId} confirmed successfully for user ${userId}`
+      );
     } catch (stripeError) {
+      logger.error(
+        `Stripe confirmation failed for ${paymentIntentId}: ${stripeError.message}`
+      );
       return res.status(400).json({
         message: "Payment failed",
         error: stripeError.message,
@@ -181,6 +208,9 @@ async function processPayment(req, res) {
     }
 
     if (paymentIntent.status !== "succeeded") {
+      logger.warn(
+        `Payment intent ${paymentIntentId} not completed | Status: ${paymentIntent.status}`
+      );
       return res.status(400).json({
         message: "Payment not completed",
         status: paymentIntent.status,
@@ -206,6 +236,7 @@ async function processPayment(req, res) {
 
           if (!book) {
             transactionError = `Book not found at index ${i}`;
+            logger.warn(transactionError);
             return false;
           }
 
@@ -213,6 +244,7 @@ async function processPayment(req, res) {
 
           if (qtyNum < 1) {
             transactionError = `Invalid quantity at index ${i}`;
+            logger.warn(transactionError);
             return false;
           }
 
@@ -229,6 +261,7 @@ async function processPayment(req, res) {
 
           if (reserve.matchedCount === 0 || reserve.modifiedCount === 0) {
             transactionError = `Insufficient stock for "${book.Title}" at index ${i}`;
+            logger.warn(transactionError);
             return false;
           }
         }
@@ -250,10 +283,14 @@ async function processPayment(req, res) {
         );
 
         order = orderResult[0];
+        logger.info(
+          `Order created successfully ✅ | Order ID: ${order._id} | User: ${userId} | Total: $${totalPrice}`
+        );
         return true;
       });
 
       if (transactionError) {
+        logger.warn(`Transaction failed: ${transactionError}`);
         return res.status(400).json({
           message: transactionError,
         });
@@ -276,7 +313,6 @@ async function processPayment(req, res) {
           },
         };
 
-        // Broadcast to all connected admins
         for (const admin of admins) {
           SocketManager.notifyUser(
             admin._id.toString(),
@@ -285,10 +321,13 @@ async function processPayment(req, res) {
           );
         }
 
-        console.log(`[Payment Notification] Sent to ${admins.length} admin(s)`);
+        logger.info(
+          `[Payment Notification] Sent to ${admins.length} admin(s) for order ${order._id}`
+        );
       } catch (notificationError) {
-        console.error("[Payment Notification Error]", notificationError);
-        // Don't fail the payment if notification fails
+        logger.error(
+          `[Payment Notification Error]: ${notificationError.message}`
+        );
       }
 
       return res.status(201).json({
@@ -300,15 +339,14 @@ async function processPayment(req, res) {
         paymentStatus: paymentIntent.status,
       });
     } catch (error) {
-      console.error("Transaction error:", error);
-
+      logger.error(`Transaction error: ${error.message}`);
       return res.status(500).json({
         message: "Transaction failed",
         error: error.message,
       });
     }
   } catch (error) {
-    console.error("processPayment error:", error);
+    logger.error(`processPayment error: ${error.message}`);
     return res.status(500).json({
       message: error.message || "Failed to process payment",
     });

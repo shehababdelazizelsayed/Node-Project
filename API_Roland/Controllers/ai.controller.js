@@ -44,11 +44,16 @@
 
 const Groq = require("groq-sdk");
 const Book = require("../models/Book");
+const logger = require("../utils/logger"); 
 
 const queryBooksWithAI = async (req, res) => {
   try {
     const { query } = req.body;
+
+    logger.info(`AI query received: ${query || "No query provided"}`); 
+
     if (!query) {
+      logger.warn("Query missing in AI request"); 
       return res
         .status(400)
         .json({ success: false, error: "Query is required" });
@@ -56,6 +61,7 @@ const queryBooksWithAI = async (req, res) => {
 
     const books = await Book.find({}, "Title Author Price Description").lean();
     if (!books?.length) {
+      logger.warn("No books found in database for AI query"); 
       return res.status(404).json({ success: false, error: "No books found" });
     }
 
@@ -90,6 +96,8 @@ Guidelines:
 
     const aiResponse = response.choices[0].message.content;
 
+    logger.info(`AI response generated successfully for query: "${query}"`); // ✅ info log
+
     return res.json({
       success: true,
       query: query,
@@ -97,7 +105,7 @@ Guidelines:
       response: aiResponse,
     });
   } catch (err) {
-    console.error("AI Error:", err.message);
+    logger.error(`AI Error: ${err.message}`, { stack: err.stack }); // ✅ error log
     return res.status(500).json({
       success: false,
       error: "Unable to process request. Please try again.",

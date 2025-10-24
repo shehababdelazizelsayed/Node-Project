@@ -13,6 +13,9 @@ const { connectRedis } = require("./utils/redis");
 const logger = require("./utils/logger");
 const errorHandler = require("./middlewares/errorHandler");
 
+// logger.info("Server started successfully ✅");
+// logger.error("Test error message ❌");
+
 const server = http.createServer(app);
 const SocketManager = require("./SocketManager");
 try {
@@ -64,8 +67,11 @@ const { queryBooksWithAI } = require("./Controllers/ai.controller");
 
 mongoose
   .connect(process.env.Mongo_URL)
-  .then(() => console.log("Connected!"))
+  .then(() => 
+    logger.info("connected successfull"),
+    console.log("Connected!"))
   .catch(() => {
+    logger.error("connection failed")
     console.log("Connected Failed ");
   });
 
