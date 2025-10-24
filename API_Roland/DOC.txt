@@ -3,13 +3,13 @@ env ==============>Mongo_URL
 to run First run this Script
 'npm install '
 'npm run dev'
-you should see Server is running on port 3000
+you should see Server is running on port 5000
 and Connected! <===== that mean you are connected to database MongoDB
 
-this will run server on port 3000 'http://localhost:3000/'
+this will run server on port 5000 'http://localhost:5000/'
 
 =========================================================================
-Post>>http://localhost:3000/api/Users/Register << UserRegister
+Post>>http://localhost:5000/api/Users/Register << UserRegister
 req.body={
 Name:"",
 Email:"",
@@ -17,14 +17,14 @@ Password:"",
 Role:""   Note: To Be more Secure we should removed that for test Only
 }
 =========================================================================
-Post>>http://localhost:3000/api/Users/Login  << UserLogin
+Post>>http://localhost:5000/api/Users/Login  << UserLogin
 
 Req.body=
 {"Email": "",
 "Password":""
 }
 =========================================================================
-patch>>http://localhost:3000/api/Users/Profile  << UserUpdate
+patch>>http://localhost:5000/api/Users/Profile  << UserUpdate
 
 Email = req.header("UserEmail");
 Password = req.header("UserPassword");
@@ -37,7 +37,7 @@ req.body={
 }
 =========================================================================
 Note "You most be Admin"
-post>>http://localhost:3000/api/Books << AddBooks
+post>>http://localhost:5000/api/Books << AddBooks
 
 Email = req.header("UserEmail");
 Password = req.header("UserPassword");
@@ -54,21 +54,22 @@ req.body={ "Title":"" required ,
 
 =========================================================================
 Note "You most be Admin"
-get>>>http://localhost:3000/api/Books << GetBooks
+get>>>http://localhost:5000/api/Books << GetBooks
 
+Email = req.header("UserEmail");
+
+Password = req.header("UserPassword");
+=========================================================================
+Note "You most be Admin"
+put >>>http://localhost:5000/api/Books/:id <<"Id in URL Required" <<UpdateBooks
 Email = req.header("UserEmail");
 Password = req.header("UserPassword");
 =========================================================================
 Note "You most be Admin"
-put >>>http://localhost:3000/api/Books/:id <<"Id in URL Required" <<UpdateBooks
-Email = req.header("UserEmail");
-Password = req.header("UserPassword");
-=========================================================================
-Note "You most be Admin"
-Delete>>http://localhost:3000/api/Books/:id <<"Id in URL Required" <<DeleteBook
+Delete>>http://localhost:5000/api/Books/:id <<"Id in URL Required" <<DeleteBook
 =========================================================================
 
-Post>>http://localhost:3000/api/Cart <<AddToCart
+Post>>http://localhost:5000/api/Cart <<AddToCart
 
 Email = req.header("UserEmail");
 Password = req.header("UserPassword");
@@ -79,17 +80,17 @@ req.body={
 }
 =========================================================================
 
-Get>>http://localhost:3000/api/Cart  <<GetCart
+Get>>http://localhost:5000/api/Cart  <<GetCart
 
 Email = req.header("UserEmail");
 Password = req.header("UserPassword");
 =========================================================================
-Delete>>http://localhost:3000/api/Cart/:id <<"Id in URL Required"<<RemoveFromCart
+Delete>>http://localhost:5000/api/Cart/:id <<"Id in URL Required"<<RemoveFromCart
 
 Email = req.header("UserEmail");
 Password = req.header("UserPassword");
 =========================================================================
-Post>>http://localhost:3000/api/Orders   <<CreateOrder
+Post>>http://localhost:5000/api/Orders   <<CreateOrder
 Email = req.header("UserEmail");
 Password = req.header("UserPassword");
 
@@ -100,13 +101,13 @@ req.body = {
     ]
   }
 =========================================================================
-get>>http://localhost:3000/api/Orders    <<GetOrders
+get>>http://localhost:5000/api/Orders    <<GetOrders
 
 Email = req.header("UserEmail");
 Password = req.header("UserPassword");
 =========================================================================
 
-Post>>http://localhost:3000/api/Reviews      <<CreateReview
+Post>>http://localhost:5000/api/Reviews      <<CreateReview
 Email = req.header("UserEmail");
 Password = req.header("UserPassword");
 
@@ -116,17 +117,17 @@ req.body = { "BookId":"",
 }
 =========================================================================
 
-Get>>http://localhost:3000/api/Reviews/:id<<"Id in URL Required"	 <<GetBookReviews
+Get>>http://localhost:5000/api/Reviews/:id<<"Id in URL Required"	 <<GetBookReviews
 
 =========================================================================
 
-Put>>http://localhost:3000/api/Review/:id<<"Id in URL Required"	 <<EditReview
+Put>>http://localhost:5000/api/Review/:id<<"Id in URL Required"	 <<EditReview
 req.body = {
 "Rating":""
 "Review":""
 }
 
-Delete>>http://localhost:3000/api/Review/:id<<"Id in URL Required"	 <<DeleteReview
+Delete>>http://localhost:5000/api/Review/:id<<"Id in URL Required"	 <<DeleteReview
 
 
 ==================================================================================================================================================

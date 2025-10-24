@@ -23,6 +23,7 @@ const reviewSchema = new schema({
     type: Date,
     default: Date.now,
   },
-});
+},   { timestamps: true } );
+reviewSchema.index({ Book: 1, createdAt: -1 });
 
 module.exports = mongoose.model("Review", reviewSchema);

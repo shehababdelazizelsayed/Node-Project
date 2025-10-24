@@ -1,0 +1,9 @@
+
+1.generate token (role in middleware use Role)
+
+bug in UserUpdate 
+2.if you are not add new data will update anyway
+
+3.remove Email form update 
+
+4.add validation in forget-password and add confirm password 

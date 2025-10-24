@@ -370,6 +370,7 @@ const UserUpdate = async (req, res) => {
     ////////////
     const userId = req.user.userId; /////
     const user = await User.findById(userId);
+    
     if (!userId) {
       return res.status(401).json({
         message: 'Unauthorized'
@@ -384,6 +385,12 @@ const UserUpdate = async (req, res) => {
 
     const updates = {};
     ////////
+
+    if(value.Name == user.Name){
+      return res.status(402).json(
+      {massage:"you must add New Name "}
+      )
+    }
     if (value.Name) { //////
       updates.Name = value.Name; /////
     }

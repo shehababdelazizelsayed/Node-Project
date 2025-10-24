@@ -55,7 +55,9 @@ const Book = require("../models/Book");
 const Joi = require('joi');
 const cloudinary = require("../Helpers/cloudinary");
 const fs = require('fs');
-
+const Review = require("../models/Review")
+const mongoose = require('mongoose');             
+const userColl = mongoose.model('User').collection.name;
 /**
  * @swagger
  * /api/Books:
@@ -361,7 +363,7 @@ async function UpdateBooks(req, res) {
       });
     }
 
-    if (req.user.Role !== "Admin" && GetThisBook.Owner.toString() !== req.user.userId) {
+    if (req.user.Role !== "Admin" && GetThisBook.Owner !== req.user.userId) {
       return res.status(403).json({
         message: "You are not allowed to edit this book"
       });
@@ -517,7 +519,7 @@ async function DeleteBook(req, res) {
       });
     }
 
-    if (req.user.Role !== "Admin" && GetThisBook.Owner.toString() !== req.user.userId) {
+    if (req.user.Role !== "Admin" && GetThisBook.Owner !== req.user.userId) {
       return res.status(403).json({
         message: "You are not allowed to delete this book"
       });
@@ -535,7 +537,96 @@ async function DeleteBook(req, res) {
     });
   }
 }
-
+/**
+ * @swagger
+ * /api/Books:
+ *   get:
+ *     summary: Get books with pagination, filters, optional reviews and stats
+ *     tags: [Books]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, minimum: 1, default: 1 }
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, minimum: 2, maximum: 100, default: 2 }
+ *         description: Number of books per page
+ *       - in: query
+ *         name: sort
+ *         schema:
+ *           type: string
+ *           enum: [Title, Price, Stock, createdAt]
+ *           default: createdAt
+ *         description: Sort field
+ *       - in: query
+ *         name: order
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *           default: desc
+ *         description: Sort order
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *         description: Search in title or author
+ *       - in: query
+ *         name: Category
+ *         schema: { type: string }
+ *         description: Filter by category
+ *       - in: query
+ *         name: priceMin
+ *         schema: { type: number, minimum: 0 }
+ *         description: Minimum price
+ *       - in: query
+ *         name: priceMax
+ *         schema: { type: number, minimum: 0 }
+ *         description: Maximum price
+ *       - in: query
+ *         name: inStock
+ *         schema: { type: boolean }
+ *         description: Only books with Stock > 0
+ *       - in: query
+ *         name: withReviews
+ *         schema: { type: boolean, default: false }
+ *         description: Include latest reviews per book
+ *       - in: query
+ *         name: reviewLimit
+ *         schema: { type: integer, minimum: 1, maximum: 50, default: 3 }
+ *         description: Number of latest reviews to include when withReviews=true
+ *       - in: query
+ *         name: withStats
+ *         schema: { type: boolean, default: false }
+ *         description: Include avgRating and reviewsCount
+ *       - in: query
+ *         name: withLastReview
+ *         schema: { type: boolean, default: true }
+ *         description: Include lastReview summary
+ *     responses:
+ *       200:
+ *         description: Books retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message: { type: string, example: "Books retrieved successfully" }
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     page: { type: integer }
+ *                     limit: { type: integer }
+ *                     total: { type: integer }
+ *                     pages: { type: integer }
+ *                 books:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Book'
+ *       400:
+ *         description: Validation error
+ *       500:
+ *         description: Internal server error
+ */
 
 // Get
 async function GetBooks(req, res) {
@@ -556,6 +647,10 @@ async function GetBooks(req, res) {
       priceMin: Joi.number().min(0),
       priceMax: Joi.number().min(0),
       inStock: Joi.boolean(),
+        withReviews: Joi.boolean().default(false),
+  reviewLimit: Joi.number().integer().min(1).max(50).default(3),
+  withStats: Joi.boolean().default(false),
+  withLastReview: Joi.boolean().default(true) 
     }).unknown(false);
 
     const {
@@ -567,7 +662,7 @@ async function GetBooks(req, res) {
     if (error) {
       return res.status(400).json({
         message: 'Validation error',
-        errors: error.details.map(d => d.message.replace(/"/g, ''))
+        errors: error.details.map(val => val.message.replace(/"/g, ''))
       });
     }
 
@@ -615,10 +710,111 @@ async function GetBooks(req, res) {
     };
 
     const total = await Book.countDocuments(filter);
-    const books = await Book.find(filter)
+      let booksQuery = Book.find(filter, value.withReviews ? undefined : { Reviews: 0 })
       .sort(sortObj)
       .skip(skip)
-      .limit(limit)
+      .limit(limit);
+    if (value.withReviews) {
+  booksQuery = booksQuery.populate({
+    path: 'Reviews',
+    select: 'User Rating Review createdAt',
+    options: { sort: { createdAt: -1 }, limit: value.reviewLimit },
+    populate: { path: 'User', select: 'Name', options: { lean: true } },
+  });
+}
+
+let books = await booksQuery.lean();
+
+function formatReviewForClient(reviewDoc) {
+  return {
+    User: { Name: reviewDoc?.User?.Name ?? null },
+    Rating: reviewDoc.Rating,
+    Review: reviewDoc.Review,
+    createdAt: reviewDoc.createdAt,
+  };
+}
+
+function normalizeBookReviews(book) {
+  if (!Array.isArray(book.Reviews) || book.Reviews.length === 0) {
+    delete book.Reviews;
+    return book;
+  }
+  book.Reviews = book.Reviews.map(formatReviewForClient);
+  return book;
+}
+
+async function computeStatsForBooks(bookIds, usersCollectionName, ReviewModel) {
+  const aggregationRows = await ReviewModel.aggregate([
+    { $match: { Book: { $in: bookIds } } },
+    { $sort: { createdAt: -1 } },
+    {
+      $group: {
+        _id: '$Book',
+        avgRating: { $avg: '$Rating' },
+        reviewsCount: { $sum: 1 },
+        lastReview: { $first: '$$ROOT' },
+      },
+    },
+    {
+      $lookup: {
+        from: usersCollectionName,
+        localField: 'lastReview.User',
+        foreignField: '_id',
+        as: 'lastUser',
+        pipeline: [{ $project: { _id: 0, Name: 1 } }],
+      },
+    },
+    {
+      $project: {
+        avgRating: 1,
+        reviewsCount: 1,
+        lastReview: {
+          rating: '$lastReview.Rating',
+          review: '$lastReview.Review',
+          createdAt: '$lastReview.createdAt',
+          userName: { $ifNull: [{ $arrayElemAt: ['$lastUser.Name', 0] }, null] },
+        },
+      },
+    },
+  ]);
+
+  const statsByIdMap = {};
+  for (const row of aggregationRows) statsByIdMap[String(row._id)] = row;
+  return statsByIdMap;
+}
+
+function attachStats(booksList, statsByIdMap, { withStats, withLastReview }) {
+  const DEFAULT_AVG = 3;
+  return booksList.map((book) => {
+    const stat = statsByIdMap[String(book._id)];
+    if (withStats) {
+      const avg = stat ? Number((stat.avgRating ?? 0).toFixed(2)) : DEFAULT_AVG;
+      book.stats = {
+        avgRating: avg,
+        reviewsCount: stat ? stat.reviewsCount : 0,
+        isDefaultAvg: !stat,
+      };
+    }
+    if (withLastReview) {
+      book.lastReview = stat ? stat.lastReview : null;
+    }
+    return book;
+  });
+}
+
+if (value.withReviews) {
+  books = books.map(normalizeBookReviews);
+}
+
+const needStats = books.length && (value.withStats || value.withLastReview);
+if (needStats) {
+  const bookIds = books.map((book) => book._id);
+  const statsById = await computeStatsForBooks(bookIds, userColl, Review); 
+  books = attachStats(books, statsById, {
+    withStats: value.withStats,
+    withLastReview: value.withLastReview,
+  });
+}
 
 
     return res.status(200).json({
@@ -627,7 +823,7 @@ async function GetBooks(req, res) {
         page,
         limit,
         total,
-        pages: Math.ceil(total / limit)
+        pages: Math.max(1, Math.ceil(total / limit))
       },
       books: books,
     });
