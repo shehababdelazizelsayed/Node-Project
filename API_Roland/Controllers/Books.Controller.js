@@ -56,7 +56,7 @@ const Joi = require('joi');
 const cloudinary = require("../Helpers/cloudinary");
 const fs = require('fs');
 const Review = require("../models/Review")
-const mongoose = require('mongoose');             
+const mongoose = require('mongoose');
 const userColl = mongoose.model('User').collection.name;
 /**
  * @swagger
@@ -241,7 +241,7 @@ async function AddBook(req, res) {
       Stock,
       Category,
       Description,
-      Image: imageUrl, 
+      Image: imageUrl,
       Pdf: pdfUrl,
       Owner: req.user.userId,
     });
@@ -547,61 +547,46 @@ async function DeleteBook(req, res) {
  *       - in: query
  *         name: page
  *         schema: { type: integer, minimum: 1, default: 1 }
- *         description: Page number
  *       - in: query
  *         name: limit
  *         schema: { type: integer, minimum: 2, maximum: 100, default: 2 }
- *         description: Number of books per page
  *       - in: query
  *         name: sort
- *         schema:
- *           type: string
- *           enum: [Title, Price, Stock, createdAt]
- *           default: createdAt
- *         description: Sort field
+ *         schema: { type: string, enum: [Title, Price, Stock, createdAt], default: createdAt }
  *       - in: query
  *         name: order
- *         schema:
- *           type: string
- *           enum: [asc, desc]
- *           default: desc
- *         description: Sort order
+ *         schema: { type: string, enum: [asc, desc], default: desc }
  *       - in: query
  *         name: search
  *         schema: { type: string }
- *         description: Search in title or author
  *       - in: query
  *         name: Category
  *         schema: { type: string }
- *         description: Filter by category
  *       - in: query
  *         name: priceMin
  *         schema: { type: number, minimum: 0 }
- *         description: Minimum price
  *       - in: query
  *         name: priceMax
  *         schema: { type: number, minimum: 0 }
- *         description: Maximum price
  *       - in: query
  *         name: inStock
  *         schema: { type: boolean }
- *         description: Only books with Stock > 0
+ *         example: true
  *       - in: query
  *         name: withReviews
  *         schema: { type: boolean, default: false }
- *         description: Include latest reviews per book
+ *         example: true
  *       - in: query
  *         name: reviewLimit
  *         schema: { type: integer, minimum: 1, maximum: 50, default: 3 }
- *         description: Number of latest reviews to include when withReviews=true
  *       - in: query
  *         name: withStats
  *         schema: { type: boolean, default: false }
- *         description: Include avgRating and reviewsCount
+ *         example: true
  *       - in: query
  *         name: withLastReview
  *         schema: { type: boolean, default: true }
- *         description: Include lastReview summary
+ *         example: false
  *     responses:
  *       200:
  *         description: Books retrieved successfully
@@ -610,7 +595,7 @@ async function DeleteBook(req, res) {
  *             schema:
  *               type: object
  *               properties:
- *                 message: { type: string, example: "Books retrieved successfully" }
+ *                 message: { type: string }
  *                 pagination:
  *                   type: object
  *                   properties:
@@ -620,12 +605,13 @@ async function DeleteBook(req, res) {
  *                     pages: { type: integer }
  *                 books:
  *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Book'
+ *                   items: { $ref: '#/components/schemas/BookWithExtras' }
  *       400:
  *         description: Validation error
- *       500:
- *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *       500: { description: Internal server error }
  */
 
 // Get
@@ -650,7 +636,7 @@ async function GetBooks(req, res) {
         withReviews: Joi.boolean().default(false),
   reviewLimit: Joi.number().integer().min(1).max(50).default(3),
   withStats: Joi.boolean().default(false),
-  withLastReview: Joi.boolean().default(true) 
+  withLastReview: Joi.boolean().default(true)
     }).unknown(false);
 
     const {
@@ -809,7 +795,7 @@ if (value.withReviews) {
 const needStats = books.length && (value.withStats || value.withLastReview);
 if (needStats) {
   const bookIds = books.map((book) => book._id);
-  const statsById = await computeStatsForBooks(bookIds, userColl, Review); 
+  const statsById = await computeStatsForBooks(bookIds, userColl, Review);
   books = attachStats(books, statsById, {
     withStats: value.withStats,
     withLastReview: value.withLastReview,

@@ -63,7 +63,7 @@ mongoose
   .catch(() => {
     console.log("Connected Failed ");
   });
-console.log(process.env.Mongo_URL);
+// console.log(process.env.Mongo_URL);
 
 app.use(express.json());
 
