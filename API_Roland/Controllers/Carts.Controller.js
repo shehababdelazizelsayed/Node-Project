@@ -91,8 +91,8 @@ const Joi = require('joi');
  */
 async function AddToCart(req, res) {
   try {
-    const CheckUser = await CheckForUser(req, res);
-    if (!CheckUser) return;
+    // const CheckUser = await CheckForUser(req, res);
+    // if (!CheckUser) return;
 
     const schema = Joi.object({
       BookId: Joi.string()
@@ -152,11 +152,11 @@ async function AddToCart(req, res) {
       });
     }
     let SelectCart = await Cart.findOne({
-      User: CheckUser._id
+      User: req.user.userId
     });
     if (!SelectCart) {
       SelectCart = await Cart.create({
-        User: CheckUser._id,
+        User: req.user.userId,
         Items: [{
           Book: GetBook._id,
           Quantity: QtyNum
@@ -251,8 +251,8 @@ async function AddToCart(req, res) {
  */
 async function GetCart(req, res) {
   try {
-    const CheckUser = await CheckForUser(req, res);
-    if (!CheckUser) return;
+    // const CheckUser = await CheckForUser(req, res);
+    // if (!CheckUser) return;
 
     const emptyBodySchema = Joi.object({}).unknown(false);
     const emptyQuerySchema = Joi.object({}).unknown(false);
@@ -277,7 +277,7 @@ async function GetCart(req, res) {
     }
 
     let SelectCart = await Cart.findOne({
-        User: CheckUser._id
+        User: req.user.userId
       })
       .populate({
         path: "Items.Book",
@@ -338,8 +338,8 @@ async function GetCart(req, res) {
  */
 async function RemoveFromCart(req, res) {
   try {
-    const CheckUser = await CheckForUser(req, res);
-    if (!CheckUser) return;
+    // const CheckUser = await CheckForUser(req, res);
+    // if (!CheckUser) return;
     const schema = Joi.object({
       id: Joi.string().hex().length(24).required()
     });
@@ -361,7 +361,7 @@ async function RemoveFromCart(req, res) {
     } = value;
 
     const SelectCart = await Cart.findOne({
-      User: CheckUser._id
+      User: req.user.userId
     });
     if (!SelectCart) {
       return res.status(404).json({

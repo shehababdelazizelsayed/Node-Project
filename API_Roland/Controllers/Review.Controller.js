@@ -406,7 +406,7 @@ async function EditReview(req, res) {
       });
     }
 
-    if (String(CheckId.User) !== String(CheckUser._id)) {
+    if (String(CheckId.User) !== String(req.user.userId)) {
       return res.status(403).json({
         message: "Not allowed to update this review"
       });
