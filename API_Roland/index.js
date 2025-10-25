@@ -1,6 +1,6 @@
 const dotenv = require("dotenv");
 dotenv.config();
-
+const cors = require("cors");
 const express = require("express");
 const path = require("path");
 const mongoose = require("mongoose");
@@ -25,6 +25,17 @@ try {
   console.error("Websocket failed cause", err);
   process.exit(1);
 }
+
+
+
+
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    credentials: true,
+  })
+);
 
 // Initialize Redis
 connectRedis();
