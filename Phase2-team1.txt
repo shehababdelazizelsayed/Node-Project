@@ -299,3 +299,35 @@ zero@zero-Dell-G15-5515:~/Desktop/Node/Node-Project/API_Roland$ curl -X POST htt
 > }'
 {"message":"Login successful","user":{"id":"68eeb2152834dce3b07e1227","Name":"Shehab","Email":"shehab200088111@gmail.com","Role":"User","IsVerified":true},"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OGVlYjIxNTI4MzRkY2UzYjA3ZTEyMjciLCJlbWFpbCI6InNoZWhhYjIwMDA4ODExMUBnbWFpbC5jb20iLCJyb2xlIjoiVXNlciIsImlhdCI6MTc2MDQ3MzgxMiwiZXhwIjoxNzYwNTYwMjEyfQ.wDajF4nHtf0dNZ7mQGsjSCZX1epx5pjDzR9zHkdKhTA"}
 
+-----------------------------------------------------------------------------------------------
+
+Payment Req
+
+curl -X POST "http://localhost:5000/api/payment/create-payment-intent"   -H "Content-Type: application/json"   
+-H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OGY2MWEwZjliMTdmODE1YTc2YWQzZDYiLCJlbWFpbCI6ImRlZGVrODA3MDNAbWVtZWF6b24uY29tIiwiUm9sZSI6IkFkbWluIiwiaWF0IjoxNzYxNDMwODMzLCJleHAiOjE3NjE1MTcyMzN9.YIspwQxdu2ZQCzVxyDzSqXp3xfwbPGRpzbqYmygNzSc"  
+ -d '{
+    "Books": [
+      {              
+        "BookId": "68f89bd5a700644003ddea04",
+        "Quantity": 1
+      }
+    ]
+  }'
+
+response:
+
+
+{"message":"Payment intent created successfully","clientSecret":"pi_3SMFpq4y7IH8bKbC0ihioSbt_secret_YDazYD4obTGRJBycaFUvdieGV","paymentIntentId":"pi_3SMFpq4y7IH8bKbC0ihioSbt","amount":500,"amountInCents":50000,"books":[{"id":"68f89bd5a700644003ddea04","title":"\"The Five love Languages\"","quantity":1,"price":500}]}
+
+
+
+Confirm payment request:
+
+ curl -X POST "http://localhost:5000/api/payment/process-payment"   -H "Content-Type: application/json"   
+ -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OGY2MWEwZjliMTdmODE1YTc2YWQzZDYiLCJlbWFpbCI6ImRlZGVrODA3MDNAbWVtZWF6b24uY29tIiwicm9sZSI6IkFkbWluIiwiaWF0IjoxNzYxMjAwODQzLCJleHAiOjE3NjEyODcyNDN9.6RfAce0q437n5ehXP92J4iluWqsNiW7lf1z6wRFRUNM"  
+  -d '{
+    "paymentIntentId": "pi_3SMFpq4y7IH8bKbC0ihioSbt",
+    "paymentMethodId": "pm_card_visa"
+  }'
+
+

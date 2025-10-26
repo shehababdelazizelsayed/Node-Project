@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { verifyToken: authMiddleware } = require("../middlewares/auth");
+const { authMiddleware } = require("../Helpers/auth.middleware");
 const {
   createPaymentIntent,
   processPayment,

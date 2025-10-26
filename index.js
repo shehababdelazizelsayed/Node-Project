@@ -9,8 +9,10 @@ const app = express();
 const port = 5000;
 const { swaggerUi, specs } = require("./swagger");
 const { connectRedis } = require("./utils/redis");
+const { requestLogger } = require("./utils/loggingMiddleware");
 
 const server = http.createServer(app);
+const cors = require("cors");
 const SocketManager = require("./SocketManager");
 try {
   SocketManager.init(server);
@@ -19,9 +21,19 @@ try {
   console.error("Websocket failed cause", err);
   process.exit(1);
 }
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    credentials: true,
+  })
+);
 
 // Initialize Redis
 connectRedis();
+
+// Add logging middleware
+app.use(requestLogger);
 
 const uploadRoute = require("./routes/uploadRoute");
 app.use("/api", uploadRoute);
@@ -68,7 +80,7 @@ mongoose
 
 // Make Redis client available app-wide
 const { getClient } = require("./utils/redis");
-app.set('redis', getClient());
+app.set("redis", getClient());
 
 app.use(express.json());
 
