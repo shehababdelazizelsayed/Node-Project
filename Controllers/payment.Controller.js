@@ -5,6 +5,7 @@ const User = require("../models/User");
 const Joi = require("joi");
 const mongoose = require("mongoose");
 const SocketManager = require("../SocketManager");
+const Cart = require("../models/Cart");
 
 // Create Payment Intent
 async function createPaymentIntent(req, res) {
@@ -18,21 +19,14 @@ async function createPaymentIntent(req, res) {
     }
 
     const schema = Joi.object({
-      Books: Joi.array()
-        .items(
-          Joi.object({
-            BookId: Joi.string()
+            CartId: Joi.string()
               .trim()
               .pattern(/^[0-9a-fA-F]{24}$/)
               .required()
               .messages({
-                "string.pattern.base": "BookId must be a valid ObjectId",
+                 "string.pattern.base": "CartId must be a valid ObjectId",
               }),
-            Quantity: Joi.number().integer().min(1).required(),
-          })
-        )
-        .min(1)
-        .required(),
+           
     });
 
     const { error, value } = schema.validate(req.body, {
@@ -47,20 +41,26 @@ async function createPaymentIntent(req, res) {
       });
     }
 
-    const { Books } = value;
+   const { CartId } = value;
+       const cart = await Cart.findOne({ _id: CartId, User: userId }).populate({
+      path: "Items.Book",
+      select: "Title Price Stock",
+    });
+
+    if (!cart || !cart.Items.length) {
+      return res.status(404).json({ message: "Cart not found or empty" });
+    }
     let totalPrice = 0;
     const bookDetails = [];
 
-    for (let i = 0; i < Books.length; i++) {
-      const item = Books[i];
+     for (const item of cart.Items) {
+      
+      const book = item.Book;
 
-      const book = await Book.findById(item.BookId);
       if (!book) {
-        return res.status(404).json({
-          message: `Book not found at index ${i}`,
-        });
-      }
+        return res.status(404).json({ message: `Book not found in cart` });
 
+      }
       if (book.Stock < item.Quantity) {
         return res.status(400).json({
           message: `Insufficient stock for "${book.Title}". Available: ${book.Stock}, Requested: ${item.Quantity}`,
@@ -71,7 +71,7 @@ async function createPaymentIntent(req, res) {
       totalPrice += itemTotal;
 
       bookDetails.push({
-        id: book._id.toString(),
+        bookId: book._id.toString(),
         title: book.Title,
         quantity: item.Quantity,
         price: book.Price,
@@ -91,8 +91,8 @@ async function createPaymentIntent(req, res) {
       currency: "usd",
       metadata: {
         userId: userId.toString(),
-        books: JSON.stringify(Books),
-        bookDetails: JSON.stringify(bookDetails),
+        cartId: CartId.toString(),
+         books: JSON.stringify(bookDetails),
       },
       payment_method_types: ["card"],
       automatic_payment_methods: {
@@ -191,7 +191,7 @@ async function processPayment(req, res) {
             : undefined,
       });
     }
-
+    const cartId = paymentIntent.metadata.cartId;
     const books = JSON.parse(paymentIntent.metadata.books);
     const totalPrice = paymentIntent.amount / 100;
 
@@ -199,59 +199,58 @@ async function processPayment(req, res) {
     let transactionError = null;
 
     try {
-      await session.withTransaction(async () => {
-        for (let i = 0; i < books.length; i++) {
-          const item = books[i];
-          const book = await Book.findById(item.BookId).session(session);
+     await session.withTransaction(async () => {
+  for (const item of books) {
+    const book = await Book.findById(item.bookId).session(session);
 
-          if (!book) {
-            transactionError = `Book not found at index ${i}`;
-            return false;
-          }
+    if (!book) {
+      transactionError = `Book not found: ${item.title}`;
+      return;
+    }
 
-          const qtyNum = Number(item.Quantity);
+    if (book.Stock < item.quantity) {
+      transactionError = `Insufficient stock for "${book.Title}"`;
+      return;
+    }
 
-          if (qtyNum < 1) {
-            transactionError = `Invalid quantity at index ${i}`;
-            return false;
-          }
+    await Book.updateOne(
+      { _id: item.bookId, Stock: { $gte: item.quantity } },
+      { $inc: { Stock: -item.quantity } },
+      { session }
+    );
+  }
 
-          const reserve = await Book.updateOne(
-            {
-              _id: item.BookId,
-              Stock: { $gte: qtyNum },
-            },
-            {
-              $inc: { Stock: -qtyNum },
-            },
-            { session }
-          );
+  if (transactionError) return;
 
-          if (reserve.matchedCount === 0 || reserve.modifiedCount === 0) {
-            transactionError = `Insufficient stock for "${book.Title}" at index ${i}`;
-            return false;
-          }
-        }
+  const orderResult = await Order.create(
+    [
+      {
+        User: user._id,
+        Books: books.map((b) => ({
+          BookId: b.bookId,
+          Quantity: b.quantity,
+        })),
+        TotalPrice: totalPrice,
+        Status: "completed",
+        PaymentIntentId: paymentIntentId,
+        CreatedAt: new Date().toISOString(),
+      },
+    ],
+    { session }
+  );
 
-        const orderResult = await Order.create(
-          [
-            {
-              _id: new mongoose.Types.ObjectId(),
-              User: user._id,
-             Books: books,
-              TotalPrice: totalPrice,
-              Status: "completed",
-              PaymentIntentId: paymentIntentId,
-              CreatedAt: new Date().toISOString(),
-              __v: 0,
-            },
-          ],
-          { session }
-        );
+  order = orderResult[0];
 
-        order = orderResult[0];
-        return true;
-      });
+  await Cart.updateOne(
+    { _id: cartId, User: userId },
+    {
+      $pull: {
+        Items: { Book: { $in: books.map((b) => b.bookId) } },
+      },
+    },
+    { session }
+  );
+});
 
       if (transactionError) {
         return res.status(400).json({

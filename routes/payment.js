@@ -21,30 +21,13 @@ const {
  *           schema:
  *             type: object
  *             required:
- *               - Books
+ *               - CartId
  *             properties:
- *               Books:
- *                 type: array
- *                 minItems: 1
- *                 items:
- *                   type: object
- *                   required:
- *                     - BookId
- *                     - Quantity
- *                   properties:
- *                     BookId:
- *                       type: string
- *                       description: Valid MongoDB ObjectId of the book
- *                     Quantity:
- *                       type: integer
- *                       minimum: 1
- *                       description: Quantity of the book to purchase
+ *               CartId:
+ *                 type: string
+ *                 description: The MongoDB ObjectId of the user's cart
  *             example:
- *               Books:
- *                 - BookId: "507f1f77bcf86cd799439011"
- *                   Quantity: 2
- *                 - BookId: "507f1f77bcf86cd799439012"
- *                   Quantity: 1
+ *               CartId: "67a34c98b1d3f905ea5d4a11"
  *     responses:
  *       200:
  *         description: Payment intent created successfully
