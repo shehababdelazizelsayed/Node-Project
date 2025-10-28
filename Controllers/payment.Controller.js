@@ -236,14 +236,14 @@ async function processPayment(req, res) {
         const orderResult = await Order.create(
           [
             {
+              _id: new mongoose.Types.ObjectId(),
               User: user._id,
-              Books: books.map((item) => ({
-                BookId: item.BookId,
-                Quantity: Number(item.Quantity),
-              })),
+             Books: books,
               TotalPrice: totalPrice,
               Status: "completed",
               PaymentIntentId: paymentIntentId,
+              CreatedAt: new Date().toISOString(),
+              __v: 0,
             },
           ],
           { session }

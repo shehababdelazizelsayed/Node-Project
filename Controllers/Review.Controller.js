@@ -217,7 +217,7 @@ async function CreateReview(req, res) {
 }
 /**
  * @swagger
- * /api/Reviews/{id}:
+ * /api/Review/{id}:
  *   get:
  *     summary: Get reviews for a book
  *     tags: [Reviews]
@@ -290,12 +290,11 @@ async function GetBookReviews(req, res) {
 
 /**
  * @swagger
- * /api/Reviews/{id}:
+ * /api/Review/{id}:
  *   put:
  *     summary: Update a review
  *     tags: [Reviews]
  *     security:
- *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -353,80 +352,114 @@ async function EditReview(req, res) {
   try {
     // const CheckUser = await CheckForUser(req, res);
     // if (!CheckUser) return;
+
+    // === Params validation (Joi) ===
     const paramsSchema = Joi.object({
-      id: Joi.string().hex().length(24).required()
+      id: Joi.string()
+        .trim()
+        .hex()
+        .length(24)
+        .required()
+        .messages({
+          'any.required': 'Review id is required',
+          'string.empty': 'Review id is required',
+          'string.hex': 'Review id is required',
+          'string.length': 'Review id is required',
+        }),
     });
-    const vParams = paramsSchema.validate(req.params, {
-      abortEarly: false,
-      stripUnknown: true
-    });
-    if (vParams.error) {
-      return res.status(400).json({
-        message: 'Review id is required'
-      });
-    }
-    const ReviewData = vParams.value.id;
 
+    let vParams;
+    try {
+      vParams = await paramsSchema.validateAsync(req.params || {}, {
+        abortEarly: false,
+        stripUnknown: true,
+      });
+    } catch {
+      return res.status(400).json({ message: 'Review id is required' });
+    }
+
+    const ReviewData = vParams.id;
     if (!ReviewData) {
-      return res.status(400).json({
-        message: "Review id is required"
-      });
+      return res.status(400).json({ message: 'Review id is required' });
     }
+
     const bodySchema = Joi.object({
-      Rating: Joi.number().integer().min(1).max(10),
-      Review: Joi.string().trim().max(1000),
-    }).or('Rating', 'Review');
-
-    const vBody = bodySchema.validate(req.body, {
-      abortEarly: false,
-      stripUnknown: true
-    });
-    if (vBody.error) {
-      return res.status(400).json({
-        message: 'Nothing to update (provide Rating and/or Review)'
+      Rating: Joi.number()
+        .integer()
+        .min(1)
+        .max(10)
+        .messages({
+          'number.base': 'Rating must be an integer between 1 and 10',
+          'number.integer': 'Rating must be an integer between 1 and 10',
+          'number.min': 'Rating must be an integer between 1 and 10',
+          'number.max': 'Rating must be an integer between 1 and 10',
+        }),
+      Review: Joi.string()
+        .trim()
+        .max(1000)
+        .messages({
+          'string.base': 'Review must be at most 1000 characters',
+          'string.max': 'Review must be at most 1000 characters',
+        }),
+    })
+      .or('Rating', 'Review')
+      .messages({
+        'object.missing': 'Nothing to update (provide Rating and/or Review)',
       });
-    }
+let vBody;
+try {
+  vBody = await bodySchema.validateAsync(req.body || {}, {
+    abortEarly: false,
+    stripUnknown: true,
+  });
+}  catch (err) {
+   const details = Array.isArray(err?.details) ? err.details : [];
+   const isMissing =
+     details.some(d => d.type === 'object.missing') ||
+     String(err?.message || '').includes('at least one of [Rating, Review]');
+   const msg = isMissing
+     ? 'Nothing to update (provide Rating and/or Review)'
+     : (details[0]?.message || 'Validation error').replace(/"/g, '');
+   return res.status(400).json({ message: msg });
+}
 
-    const UpdateRating = vBody.value.Rating;
-    const UpdateReview = vBody.value.Review;
+
+    const UpdateRating = vBody.Rating;
+    const UpdateReview = vBody.Review;
 
     const HasRating = UpdateRating !== undefined && UpdateRating !== null;
     const HasText = UpdateReview !== undefined && UpdateReview !== null;
 
     if (!HasRating && !HasText) {
       return res.status(400).json({
-        message: "Nothing to update (provide Rating and/or Review)"
+        message: 'Nothing to update (provide Rating and/or Review)',
       });
     }
 
     const CheckId = await Review.findById(ReviewData);
     if (!CheckId) {
-      return res.status(404).json({
-        message: "Review not found"
-      });
+      return res.status(404).json({ message: 'Review not found' });
     }
 
     if (String(CheckId.User) !== String(req.user.userId)) {
-      return res.status(403).json({
-        message: "Not allowed to update this review"
-      });
+      return res.status(403).json({ message: 'Not allowed to update this review' });
     }
 
     if (HasRating) {
       const RatingNum = Number(UpdateRating);
       if (!Number.isInteger(RatingNum) || RatingNum < 1 || RatingNum > 10) {
         return res.status(400).json({
-          message: "Rating must be an integer between 1 and 10"
+          message: 'Rating must be an integer between 1 and 10',
         });
-      }
+        }
       CheckId.Rating = RatingNum;
     }
 
     if (HasText) {
-      let ReviewText = String(UpdateReview).trim();
+      const ReviewText = String(UpdateReview).trim();
       if (ReviewText.length > 1000) {
         return res.status(400).json({
-          message: "Review must be at most 1000 characters"
+          message: 'Review must be at most 1000 characters',
         });
       }
       CheckId.Review = ReviewText;
@@ -435,21 +468,20 @@ async function EditReview(req, res) {
     await CheckId.save();
 
     return res.status(200).json({
-      message: "Review updated successfully",
+      message: 'Review updated successfully',
       reviewId: CheckId._id,
       rating: CheckId.Rating,
-      review: CheckId.Review
+      review: CheckId.Review,
     });
   } catch (error) {
-    console.error("EditReview:", error);
-    return res.status(500).json({
-      message: error.message
-    });
+    console.error('EditReview:', error);
+    return res.status(500).json({ message: error.message });
   }
 }
+
 /**
  * @swagger
- * /api/Reviews/{id}:
+ * /api//Reviews{id}:
  *   delete:
  *     summary: Delete a review
  *     tags: [Reviews]

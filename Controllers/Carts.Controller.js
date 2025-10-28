@@ -42,7 +42,7 @@ const Joi = require('joi');
 
 /**
  * @swagger
- * /api/Carts:
+ * /api/Cart:
  *   post:
  *     summary: Add book to cart
  *     tags: [Carts]
@@ -222,7 +222,7 @@ async function AddToCart(req, res) {
 }
 /**
  * @swagger
- * /api/Carts:
+ * /api/Cart:
  *   get:
  *     summary: Get user's cart
  *     tags: [Carts]
@@ -302,7 +302,7 @@ async function GetCart(req, res) {
 }
 /**
  * @swagger
- * /api/Carts/{id}:
+ * /api/Cart/{id}:
  *   delete:
  *     summary: Remove book from cart
  *     tags: [Carts]

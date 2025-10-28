@@ -1,3 +1,4 @@
+
 const dotenv = require("dotenv");
 dotenv.config();
 
@@ -28,6 +29,7 @@ app.use(
     credentials: true,
   })
 );
+app.use(express.json());
 
 // Initialize Redis
 connectRedis();
@@ -82,7 +84,6 @@ mongoose
 const { getClient } = require("./utils/redis");
 app.set("redis", getClient());
 
-app.use(express.json());
 
 //  Users Routes
 app.post("/api/Users/Register", UserRegister);
