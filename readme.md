@@ -110,7 +110,7 @@ class User,Book,Review,Cart,Payment,Order entity
 class UO,UW,UH,UP,BB,BH,BC,BP,CP,PO,RF,RB relation
 class AdminRole,UserRole role
 ```
-![alt text](image.png)
+![alt text](image.jpeg)
 ##  Folder Structure
 ```bash
 
