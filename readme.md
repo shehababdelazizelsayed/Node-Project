@@ -1,0 +1,193 @@
+#  Bookstore REST API
+
+A Node.js + Express + MongoDB backend for an online bookstore.  
+Supports user authentication, role-based access control, shopping cart, payment, orders, reviews, and file uploads (images + PDFs).
+
+---
+
+##  Features
+
+###  Authentication & Authorization
+- JWT-based login/register/logout.
+- Email verification and password reset via token.
+- Role-based access:
+  - **Admin** → can add / edit / delete books.
+  - **User** → can browse, add reviews, manage cart, and place orders.
+
+###  Books
+- CRUD endpoints for books with Cloudinary image/PDF upload.
+- Filtering, searching, sorting, and pagination.
+- Joi validation for all book data.
+
+###  Cart & Orders
+- Each user has a single active cart.
+- Add / remove books and update quantities.
+- Checkout creates a **Payment Intent (Stripe)**.
+- Successful payment automatically converts Cart → Order.
+
+###  Reviews
+- Authenticated users can rate and review books (1–10).
+- One review per user per book.
+- Automatic aggregation for average rating and review count.
+
+###  Uploads
+- Cloudinary integration for book covers and PDFs.
+- Multer for file handling.
+
+---
+
+## Tech Stack
+
+| Layer | Tech |
+|-------|------|
+| Runtime | Node.js |
+| Framework | Express.js |
+| Database | MongoDB + Mongoose |
+| Validation | Joi |
+| Auth | JWT + bcrypt |
+| Uploads | Cloudinary + Multer |
+| Email | Nodemailer |
+| Docs | Swagger UI |
+| Cache | Redis (optional) |
+| Payment | Stripe |
+
+---
+## ERD
+
+```mermaid
+flowchart LR
+
+%% === Entities ===
+User([User])
+Book([Book])
+Review([Review])
+Cart([Cart])
+Payment([Payment])
+Order([Order])
+
+%% === Roles ===
+AdminRole[(Admin)]
+UserRole[(User)]
+
+%% === Relationship Diamonds (rhombus) ===
+UO{{"owns (Admin only)"}}
+UW{{"writes"}}
+UH{{"has"}}
+UP{{"places"}}
+BB{{"belongs to"}}
+BH{{"has"}}
+BC{{"in cart"}}
+BP{{"initiates payment"}}
+CP{{"for payment"}}
+
+RF{{"for"}}
+RB{{"by"}}
+
+%% === Connections ===
+User --> AdminRole
+User --> UserRole
+
+AdminRole --> UO --> Book
+UserRole --> UW --> Review
+UserRole --> UH --> Cart
+UserRole --> BP --> Payment
+
+Book --> BB --> AdminRole
+Book --> BH --> Review
+Book --> BC --> Cart
+Cart --> CP --> Payment
+Payment -->  Order
+
+Review --> RF --> Book
+Review --> RB --> UserRole
+
+%% %% === Styling ===
+classDef entity fill:none,stroke:#ffffff,stroke-width:1.5px,color:#ffffff,font-weight:bold;
+classDef relation fill:none,stroke:#ffffff,stroke-width:1px,color:#ffffff,font-style:italic;
+classDef role fill:none,stroke:#ffffff,stroke-dasharray:3 3,color:#ffffff,font-style:italic;
+
+class User,Book,Review,Cart,Payment,Order entity
+class UO,UW,UH,UP,BB,BH,BC,BP,CP,PO,RF,RB relation
+class AdminRole,UserRole role
+```
+![alt text](image.png)
+##  Folder Structure
+```bash
+
+API_Roland/
+│
+├── index.js # App entry point (creates server, loads routes)
+├── config.js # Environment variables & MongoDB connection
+├── swagger.js # Swagger API documentation setup
+│
+├── Helpers/ # Utility modules
+│ ├── upload.js # Multer upload configuration
+│ ├── sendEmail.js # Nodemailer for email verification/reset
+│ ├── Login.Helper.js # Login & user validation helper
+│ ├── cloudinary.js # Cloudinary file upload integration
+│ └── auth.middleware.js # JWT authentication & role-based access
+│
+├── Controllers/ # Business logic for all modules
+│ ├── Users.Controller.js # Register, login, profile, password reset
+│ ├── Books.Controller.js # CRUD operations, filtering, search
+│ ├── Orders.Controller.js # Create/get orders after payment
+│ ├── Carts.Controller.js # Manage cart items (add/remove/view)
+│ ├── Review.Controller.js # Add/edit/delete book reviews
+│ ├── Uploads.Controller.js # Handle uploads via Cloudinary
+│ └── BookUsers.Controller.js # Owner/Admin book management
+│
+├── models/ # Mongoose schemas
+│ ├── User.js # Users collection (Admin/User roles)
+│ ├── Book.js # Books with refs to Owner & Reviews
+│ ├── Review.js # Book reviews & ratings
+│ ├── Cart.js # User cart containing book items
+│ └── Order.js # Orders created from payment intent
+│
+├── routes/ # Express routers
+│ ├── auth.js # Auth routes (register/login/verify/reset)
+│ ├── ai.routes.js # AI/assistant endpoint (optional)
+│ └── uploadRoute.js # Image/PDF upload routes
+│
+├── utils/ # Shared utilities
+│ ├── redis.js # Redis caching & session setup
+│ └── logger.js # Winston-style logging utility
+│
+├── package.json # Dependencies and scripts
+└── .env # Environment configuration (not committed)
+
+```
+## ⚙️ Installation
+
+```bash
+git clone https://github.com/shehababdelazizelsayed/Node-Project.git
+cd Node-Project/API_Roland
+npm install
+npm run dev
+
+Server runs on http://localhost:5000 OR AWS LIVE ====> http://44.223.33.15/api-docs/
+
+```
+
+## ENV
+```
+PORT=5000
+
+MONGO_URI=mongodb+srv://<your-cluster>
+
+JWT_SECRET=<your-secret>
+
+CLOUDINARY_NAME=<cloud-name>
+
+CLOUDINARY_API_KEY=<api-key>
+
+CLOUDINARY_API_SECRET=<api-secret>
+
+EMAIL_USER=<email>
+
+EMAIL_PASS=<password>
+
+STRIPE_SECRET=<stripe-key>
+
+REDIS_URL=redis://127.0.0.1:6379
+
+```
