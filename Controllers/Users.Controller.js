@@ -129,7 +129,7 @@ const UserRegister = async (req, res) => {
       Token: Joi.string(),
 
       Role: Joi.string()
-        .valid("User", "Admin")
+        .valid("User")
         .empty("")
         .default("User")
         .messages({
@@ -182,7 +182,7 @@ const UserRegister = async (req, res) => {
     return res.status(201).json({
       message: "Registration successful",
       user: {
-        id: user._id,
+      
         Name: user.Name,
         Email: user.Email,
         Role: user.Role,
@@ -258,8 +258,6 @@ const UserLogin = async (req, res) => {
       user: {
         id: user._id,
         Name: user.Name,
-        Email: user.Email,
-        Role: user.Role,
         IsVerified: user.IsVerified,
       },
       token,
@@ -689,6 +687,42 @@ const ResetPassword = async (req, res) => {
   }
 };
 
+const ChangeUserRole = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { Role } = req.body;
+    const {Email} = req.body
+
+    const validRoles = ["User", "Owner", "Admin"];
+    if (!validRoles.includes(Role)) {
+      return res.status(400).json({ message: "Invalid role" });
+    }
+     const user = id
+      ? await User.findById(id)
+      : await User.findOne({ Email: Email?.toLowerCase().trim() });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    user.Role = Role;
+    await user.save();
+
+    res.status(200).json({
+      message: "User role updated successfully",
+      user: {
+        
+        Name: user.Name,
+        Email: user.Email,
+        Role: user.Role,
+      },
+    });
+  } catch (error) {
+    console.error("ChangeUserRole error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   UserLogin,
   UserRegister,
@@ -696,4 +730,5 @@ module.exports = {
   VerifyEmail,
   ForgotPassword,
   ResetPassword,
+  ChangeUserRole
 };

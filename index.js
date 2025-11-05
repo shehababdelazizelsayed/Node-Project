@@ -50,6 +50,7 @@ const {
   VerifyEmail,
   ForgotPassword,
   ResetPassword,
+  ChangeUserRole
 } = require("./Controllers/Users.Controller");
 const {
   AddBook,
@@ -136,6 +137,20 @@ app.delete("/api/Review/:id", authMiddleware, DeleteReview);
 
 //  BookUsers Routes
 app.get("/api/BookUsers", authMiddleware, getAllBookUsers);
+
+app.patch(
+  "/api/Users/change-role/:id",
+  authMiddleware,
+  authorizeRoles("Owner", "Admin"),
+  ChangeUserRole
+);
+
+app.patch(
+  "/api/Users/change-role",
+  authMiddleware,
+  authorizeRoles("Owner", "Admin"),
+  ChangeUserRole
+);
 
 // Payment routes
 const paymentRoutes = require("./routes/payment");

@@ -95,17 +95,9 @@ const { getCache, setCache, deleteCache } = require("../utils/redis");
  *               Stock:
  *                 type: integer
  *                 description: Book stock quantity
- *               Image:
- *                 type: string
- *                 format: uri
- *                 description: Book image URL
  *               Category:
  *                 type: string
  *                 description: Book category
- *               Pdf:
- *                 type: string
- *                 format: uri
- *                 description: Book PDF URL (optional if file is uploaded)
  *               pdf:
  *                 type: string
  *                 format: binary
@@ -300,17 +292,9 @@ async function AddBook(req, res) {
  *               Stock:
  *                 type: integer
  *                 description: Book stock quantity
- *               Image:
- *                 type: string
- *                 format: uri
- *                 description: Book image URL
  *               Category:
  *                 type: string
  *                 description: Book category
- *               Pdf:
- *                 type: string
- *                 format: uri
- *                 description: Book PDF URL
  *     responses:
  *       200:
  *         description: Book updated successfully
