@@ -1,56 +1,3 @@
-/**
- * @swagger
- * components:
- *   schemas:
- *     Book:
- *       type: object
- *       required:
- *         - Title
- *         - Author
- *         - Price
- *         - Description
- *         - Category
- *       properties:
- *         Title:
- *           type: string
- *           description: Book title
- *         Author:
- *           type: string
- *           description: Book author
- *         Price:
- *           type: number
- *           description: Book price
- *         Description:
- *           type: string
- *           description: Book description
- *         Stock:
- *           type: integer
- *           description: Book stock quantity
- *         Image:
- *           type: string
- *           format: uri
- *           description: Book image URL
- *         Category:
- *           type: string
- *           description: Book category
- *         Pdf:
- *           type: string
- *           format: uri
- *           description: Book PDF URL
- *         Owner:
- *           type: string
- *           description: Owner user ID
- *       example:
- *         Title: Sample Book
- *         Author: John Doe
- *         Price: 29.99
- *         Description: A great book
- *         Stock: 10
- *         Category: Fiction
- *         Image: http://example.com/image.jpg
- *         Pdf: http://example.com/pdf.pdf
- *         Owner: userId
- */
 const Book = require("../models/Book");
 const Joi = require('joi');
 const cloudinary = require("../Helpers/cloudinary");
@@ -59,74 +6,14 @@ const Review = require("../models/Review")
 const mongoose = require('mongoose');
 const userColl = mongoose.model('User').collection.name;
 const { getCache, setCache, deleteCache } = require("../utils/redis");
-/**
- * @swagger
- * /api/Books:
- *   post:
- *     summary: Add a new book
- *     tags: [Books]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             required:
- *               - Title
- *               - Author
- *               - Price
- *               - Description
- *               - Category
- *             properties:
- *               Title:
- *                 type: string
- *                 description: Book title
- *               Author:
- *                 type: string
- *                 description: Book author
- *               Price:
- *                 type: number
- *                 description: Book price
- *               Description:
- *                 type: string
- *                 description: Book description
- *               Stock:
- *                 type: integer
- *                 description: Book stock quantity
- *               Category:
- *                 type: string
- *                 description: Book category
- *               pdf:
- *                 type: string
- *                 format: binary
- *                 description: PDF file to upload
- *               image:
- *                 type: string
- *                 format: binary
- *                 description: Image file to upload
- *     responses:
- *       201:
- *         description: Book created successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 Book:
- *                   $ref: '#/components/schemas/Book'
- *       400:
- *         description: Validation error
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden
- *       500:
- *         description: Internal server error
- */
+const User = require("../models/User");
+const sendEmail = require("../utils/sendEmail");
+
+// Normalization function: lowercase, remove non-alphanumeric except spaces, then remove spaces
+function normalizeString(str) {
+  if (!str) return '';
+  return str.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '');
+}
 
 // Add
 async function AddBook(req, res) {
@@ -166,6 +53,32 @@ async function AddBook(req, res) {
       Category,
       Pdf
     } = value;
+
+    // Normalize for uniqueness checks
+    const normalizedTitle = normalizeString(Title);
+    const normalizedImage = normalizeString(Image);
+    const normalizedPdf = normalizeString(Pdf);
+
+    // Check uniqueness only for provided fields
+    let orConditions = [];
+    if (normalizedTitle) {
+      orConditions.push({ Title: { $regex: new RegExp(`^${normalizedTitle}$`, 'i') } });
+    }
+    if (normalizedImage) {
+      orConditions.push({ Image: { $regex: new RegExp(`^${normalizedImage}$`, 'i') } });
+    }
+    if (normalizedPdf) {
+      orConditions.push({ Pdf: { $regex: new RegExp(`^${normalizedPdf}$`, 'i') } });
+    }
+
+    if (orConditions.length > 0) {
+      const existingBook = await Book.findOne({ $or: orConditions });
+      if (existingBook) {
+        return res.status(400).json({
+          message: 'Book with similar Title, Image, or Pdf already exists'
+        });
+      }
+    }
 
     let pdfUrl = Pdf;
     let imageUrl = Image;
@@ -237,10 +150,21 @@ async function AddBook(req, res) {
       Image: imageUrl,
       Pdf: pdfUrl,
       Owner: req.user.userId,
+      Status: "Pending", // Default is Pending, but explicit
     });
 
     // Invalidate cache for books list
     await deleteCache('books:*');
+
+    // Notify all admins
+    const admins = await User.find({ Role: "Admin" });
+    for (const admin of admins) {
+      await sendEmail(
+        admin.Email,
+        "New Book Added for Approval",
+        `Hello ${admin.Name},\n\nA new book has been added by ${req.user.name || 'a user'} and is pending approval.\n\nBook Details:\nTitle: ${Title}\nAuthor: ${Author}\nCategory: ${Category}\n\nPlease review and approve/reject the book.\n\nThanks!`
+      );
+    }
 
     return res.status(201).json({
       message: "Book created successfully",
@@ -255,69 +179,6 @@ async function AddBook(req, res) {
   }
 };
 
-/**
- * @swagger
- * /api/Books/{id}:
- *   put:
- *     summary: Update a book
- *     tags: [Books]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Book ID
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               Title:
- *                 type: string
- *                 description: Book title
- *               Author:
- *                 type: string
- *                 description: Book author
- *               Price:
- *                 type: number
- *                 description: Book price
- *               Description:
- *                 type: string
- *                 description: Book description
- *               Stock:
- *                 type: integer
- *                 description: Book stock quantity
- *               Category:
- *                 type: string
- *                 description: Book category
- *     responses:
- *       200:
- *         description: Book updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 Book:
- *                   $ref: '#/components/schemas/Book'
- *       400:
- *         description: Validation error or invalid ID
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden
- *       404:
- *         description: Book not found
- *       500:
- *         description: Internal server error
- */
 
 // Update
 async function UpdateBooks(req, res) {
@@ -437,44 +298,6 @@ async function UpdateBooks(req, res) {
   }
 }
 
-/**
- * @swagger
- * /api/Books/{id}:
- *   delete:
- *     summary: Delete a book
- *     tags: [Books]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Book ID
- *     responses:
- *       200:
- *         description: Book deleted successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 Book:
- *                   $ref: '#/components/schemas/Book'
- *       400:
- *         description: Invalid ID
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden
- *       404:
- *         description: Book not found
- *       500:
- *         description: Internal server error
- */
 
 // Delete
 async function DeleteBook(req, res) {
@@ -532,82 +355,6 @@ async function DeleteBook(req, res) {
     });
   }
 }
-/**
- * @swagger
- * /api/Books:
- *   get:
- *     summary: Get books with pagination, filters, optional reviews and stats
- *     tags: [Books]
- *     parameters:
- *       - in: query
- *         name: page
- *         schema: { type: integer, minimum: 1, default: 1 }
- *       - in: query
- *         name: limit
- *         schema: { type: integer, minimum: 2, maximum: 100, default: 2 }
- *       - in: query
- *         name: sort
- *         schema: { type: string, enum: [Title, Price, Stock, createdAt], default: createdAt }
- *       - in: query
- *         name: order
- *         schema: { type: string, enum: [asc, desc], default: desc }
- *       - in: query
- *         name: search
- *         schema: { type: string }
- *       - in: query
- *         name: Category
- *         schema: { type: string }
- *       - in: query
- *         name: priceMin
- *         schema: { type: number, minimum: 0 }
- *       - in: query
- *         name: priceMax
- *         schema: { type: number, minimum: 0 }
- *       - in: query
- *         name: inStock
- *         schema: { type: boolean }
- *         example: true
- *       - in: query
- *         name: withReviews
- *         schema: { type: boolean, default: false }
- *         example: true
- *       - in: query
- *         name: reviewLimit
- *         schema: { type: integer, minimum: 1, maximum: 50, default: 3 }
- *       - in: query
- *         name: withStats
- *         schema: { type: boolean, default: false }
- *         example: true
- *       - in: query
- *         name: withLastReview
- *         schema: { type: boolean, default: true }
- *         example: false
- *     responses:
- *       200:
- *         description: Books retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message: { type: string }
- *                 pagination:
- *                   type: object
- *                   properties:
- *                     page: { type: integer }
- *                     limit: { type: integer }
- *                     total: { type: integer }
- *                     pages: { type: integer }
- *                 books:
- *                   type: array
- *                   items: { $ref: '#/components/schemas/BookWithExtras' }
- *       400:
- *         description: Validation error
- *         content:
- *           application/json:
- *             schema: { $ref: '#/components/schemas/ErrorResponse' }
- *       500: { description: Internal server error }
- */
 
 // Get
 async function GetBooks(req, res) {
@@ -832,9 +579,84 @@ if (needStats) {
   }
 }
 
+// Approve/Reject Book (Admin only)
+async function ApproveRejectBook(req, res) {
+  try {
+    const paramsSchema = Joi.object({
+      id: Joi.string().hex().length(24).required()
+    });
+    const vParams = paramsSchema.validate(req.params, {
+      stripUnknown: true
+    });
+    if (vParams.error) return res.status(400).json({
+      message: 'Invalid id'
+    });
+
+    const { id } = vParams.value;
+
+    const bodySchema = Joi.object({
+      status: Joi.string().valid("Approved", "Rejected").required()
+    });
+    const vBody = bodySchema.validate(req.body, {
+      abortEarly: false,
+      stripUnknown: true
+    });
+    if (vBody.error) {
+      return res.status(400).json({
+        message: 'Validation error',
+        errors: vBody.error.details.map(d => d.message.replace(/"/g, ''))
+      });
+    }
+
+    const { status } = vBody.value;
+
+    const book = await Book.findById(id).populate('Owner', 'Name Email');
+    if (!book) {
+      return res.status(404).json({
+        message: "Book not found"
+      });
+    }
+
+    if (book.Status !== "Pending") {
+      return res.status(400).json({
+        message: "Book is not pending approval"
+      });
+    }
+
+    book.Status = status;
+    await book.save();
+
+    // Invalidate cache for books list
+    await deleteCache('books:*');
+
+    // Notify the book owner
+    await sendEmail(
+      book.Owner.Email,
+      `Book ${status.toLowerCase()}`,
+      `Hello ${book.Owner.Name},\n\nYour book "${book.Title}" has been ${status.toLowerCase()} by an admin.\n\nThanks!`
+    );
+
+    return res.status(200).json({
+      message: `Book ${status.toLowerCase()} successfully`,
+      book: {
+        _id: book._id,
+        Title: book.Title,
+        Status: book.Status
+      }
+    });
+
+  } catch (error) {
+    console.error("ApproveRejectBook:", error);
+    return res.status(500).json({
+      message: error.message
+    });
+  }
+}
+
 module.exports = {
   AddBook,
   GetBooks,
   UpdateBooks,
-  DeleteBook
+  DeleteBook,
+  ApproveRejectBook
 };

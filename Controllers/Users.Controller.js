@@ -1,94 +1,11 @@
-/**
- * @swagger
- * components:
- *   schemas:
- *     User:
- *       type: object
- *       required:
- *         - Name
- *         - Email
- *         - Password
- *         - Role
- *       properties:
- *         Name:
- *           type: string
- *           description: User's full name
- *         Email:
- *           type: string
- *           format: email
- *           description: User's email address
- *         Password:
- *           type: string
- *           description: User's password
- *         Role:
- *           type: string
- *           enum: [User, Owner, Admin]
- *           description: User's role
- *         isVerified:
- *           type: boolean
- *           description: Email verification status
- *       example:
- *         Name: Mohamed Magdy
- *         Email: Mohamed@example.com
- *         Password: password123
- *         Role: User
- *         isVerified: false
- */
+
 const User = require("../models/User");
 const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 const sendEmail = require("../utils/sendEmail");
 const { CheckForUser } = require("../Helpers/Login.Helper");
 const Joi = require("joi");
-/**
- * @swagger
- * /api/Users/Register:
- *   post:
- *     summary: Register a new user
- *     tags: [Users]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - Name
- *               - Email
- *               - Password
- *             properties:
- *               Name:
- *                 type: string
- *                 description: User's full name
- *               Email:
- *                 type: string
- *                 format: email
- *                 description: User's email address
- *               Password:
- *                 type: string
- *                 description: User's password
- *               Role:
- *                 type: string
- *                 enum: [User, Admin]
- *                 default: User
- *                 description: User's role
- *     responses:
- *       201:
- *         description: User registered successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 user:
- *                   $ref: '#/components/schemas/User'
- *       400:
- *         description: Validation error or email already registered
- *       500:
- *         description: Internal server error
- */
+
 const UserRegister = async (req, res) => {
   try {
     const { Name, Email, Password, Role } = req.body;
@@ -195,51 +112,7 @@ const UserRegister = async (req, res) => {
     });
   }
 };
-/**
- * @swagger
- * /api/Users/Login:
- *   post:
- *     summary: Login a user
- *     tags: [Users]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - Email
- *               - Password
- *             properties:
- *               Email:
- *                 type: string
- *                 format: email
- *                 description: User's email address
- *               Password:
- *                 type: string
- *                 description: User's password
- *     responses:
- *       200:
- *         description: Login successful
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 user:
- *                   $ref: '#/components/schemas/User'
- *                 token:
- *                   type: string
- *                   description: JWT token
- *       400:
- *         description: Invalid credentials
- *       403:
- *         description: Email not verified
- *       500:
- *         description: Internal server error
- */
+
 const UserLogin = async (req, res) => {
   try {
     const result = await CheckForUser(req, res);
@@ -269,53 +142,7 @@ const UserLogin = async (req, res) => {
     });
   }
 };
-/**
- * @swagger
- * /api/Users/Update:
- *   put:
- *     summary: Update user profile
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               Name:
- *                 type: string
- *                 description: User's full name
- *               Email:
- *                 type: string
- *                 format: email
- *                 description: User's email address
- *               NewPassword:
- *                 type: string
- *                 description: New password (requires CurrentPassword)
- *               CurrentPassword:
- *                 type: string
- *                 description: Current password (required if changing password)
- *     responses:
- *       200:
- *         description: Profile updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 user:
- *                   $ref: '#/components/schemas/User'
- *       400:
- *         description: Validation error or no fields to update
- *       401:
- *         description: Unauthorized or incorrect current password
- *       500:
- *         description: Internal server error
- */
+
 const UserUpdate = async (req, res) => {
   try {
     const schema = Joi.object({
@@ -451,34 +278,7 @@ const UserUpdate = async (req, res) => {
   }
 };
 
-/**
- * @swagger
- * /api/Users/verify/{token}:
- *   get:
- *     summary: Verify user email
- *     tags: [Users]
- *     parameters:
- *       - in: path
- *         name: token
- *         required: true
- *         schema:
- *           type: string
- *         description: Verification token
- *     responses:
- *       200:
- *         description: Email verified successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *       400:
- *         description: Invalid or expired token
- *       500:
- *         description: Internal server error
- */
+
 // Verify Email
 const VerifyEmail = async (req, res) => {
   try {
@@ -512,40 +312,7 @@ const VerifyEmail = async (req, res) => {
   }
 };
 
-/**
- * @swagger
- * /api/Users/forgot-password:
- *   post:
- *     summary: Send password reset email
- *     tags: [Users]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - Email
- *             properties:
- *               Email:
- *                 type: string
- *                 format: email
- *                 description: User's email address
- *     responses:
- *       200:
- *         description: Reset password email sent successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *       404:
- *         description: No user found with this email
- *       500:
- *         description: Internal server error
- */
+
 // Forgot Password
 const ForgotPassword = async (req, res) => {
   try {
@@ -582,46 +349,7 @@ const ForgotPassword = async (req, res) => {
   }
 };
 
-/**
- * @swagger
- * /api/Users/reset-password/{token}:
- *   post:
- *     summary: Reset user password
- *     tags: [Users]
- *     parameters:
- *       - in: path
- *         name: token
- *         required: true
- *         schema:
- *           type: string
- *         description: Reset password token
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - newPassword
- *             properties:
- *               newPassword:
- *                 type: string
- *                 description: New password
- *     responses:
- *       200:
- *         description: Password has been reset successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *       400:
- *         description: Invalid or expired token
- *       500:
- *         description: Internal server error
- */
+
 // Reset Password
 const ResetPassword = async (req, res) => {
   try {

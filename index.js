@@ -8,7 +8,6 @@ const mongoose = require("mongoose");
 const http = require("http");
 const app = express();
 const port = 5000;
-const { swaggerUi, specs } = require("./swagger");
 const { connectRedis } = require("./utils/redis");
 const { requestLogger } = require("./utils/loggingMiddleware");
 
@@ -57,6 +56,7 @@ const {
   GetBooks,
   UpdateBooks,
   DeleteBook,
+  ApproveRejectBook,
 } = require("./Controllers/Books.Controller");
 const {
   AddToCart,
@@ -119,6 +119,12 @@ app.delete(
   authorizeRoles("Owner", "Admin"),
   DeleteBook
 );
+app.patch(
+  "/api/Books/:id/status",
+  authMiddleware,
+  authorizeRoles("Admin"),
+  ApproveRejectBook
+);
 
 // Cart Routes
 app.post("/api/Cart", authMiddleware, AddToCart);
@@ -156,61 +162,7 @@ app.patch(
 const paymentRoutes = require("./routes/payment");
 app.use("/api/payment", paymentRoutes);
 
-/**
- * @swagger
- * /api/notify:
- *   post:
- *     summary: Send WebSocket notification to all connected clients
- *     tags: [WebSocket]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - type
- *               - message
- *             properties:
- *               type:
- *                 type: string
- *                 description: Type of notification
- *               message:
- *                 type: string
- *                 description: Notification message
- *               data:
- *                 type: object
- *                 description: Additional data for the notification
- *             example:
- *               type: "info"
- *               message: "New book added"
- *               data: { bookId: "123" }
- *     responses:
- *       200:
- *         description: Notification sent successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *       400:
- *         description: Validation error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *       401:
- *         description: Unauthorized
- *       500:
- *         description: Internal server error
- */
+
 
 // WebSocket notification routes
 app.post("/api/notify", authMiddleware, (req, res) => {
@@ -235,15 +187,11 @@ app.post("/api/notify", authMiddleware, (req, res) => {
   }
 });
 
-// Swagger
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(specs));
-
 //uploads
 app.use("/static", express.static(path.join(__dirname, "public")));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 server.listen(port, () => {
   console.log("server is running on port " + port);
-  console.log(`Swagger docs available at http://localhost:${port}/api-docs`);
 });
 app.post("/api/ai", authMiddleware, queryBooksWithAI);

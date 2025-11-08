@@ -1,36 +1,3 @@
-/**
- * @swagger
- * components:
- *   schemas:
- *     Review:
- *       type: object
- *       required:
- *         - User
- *         - Book
- *         - Rating
- *       properties:
- *         User:
- *           type: string
- *           description: User ID
- *         Book:
- *           type: string
- *           description: Book ID
- *         Rating:
- *           type: integer
- *           minimum: 1
- *           maximum: 10
- *           description: Rating from 1 to 10
- *         Review:
- *           type: string
- *           maxLength: 1000
- *           description: Review text
- *         createdAt:
- *           type: string
- *           format: date-time
- *         updatedAt:
- *           type: string
- *           format: date-time
- */
 const Review = require("../models/Review")
 const Joi = require('joi');
 const Book = require("../models/Book");
@@ -38,63 +5,6 @@ const {
   CheckForUser
 } = require("../Helpers/Login.Helper");
 
-/**
- * @swagger
- * /api/Reviews:
- *   post:
- *     summary: Create a new review
- *     tags: [Reviews]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - BookId
- *               - Rating
- *             properties:
- *               BookId:
- *                 type: string
- *                 description: Book ID to review
- *               Rating:
- *                 type: integer
- *                 minimum: 1
- *                 maximum: 10
- *                 description: Rating from 1 to 10
- *               Review:
- *                 type: string
- *                 maxLength: 1000
- *                 description: Review text (optional)
- *     responses:
- *       201:
- *         description: Review created successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 reviewId:
- *                   type: string
- *                 bookId:
- *                   type: string
- *                 rating:
- *                   type: integer
- *       400:
- *         description: Validation error
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: Book not found
- *       409:
- *         description: Review already exists
- *       500:
- *         description: Internal server error
- */
 async function CreateReview(req, res) {
   try {
 
@@ -215,37 +125,6 @@ async function CreateReview(req, res) {
   }
 
 }
-/**
- * @swagger
- * /api/Review/{id}:
- *   get:
- *     summary: Get reviews for a book
- *     tags: [Reviews]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Book ID
- *     responses:
- *       200:
- *         description: Reviews retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/Review'
- *       400:
- *         description: Validation error
- *       401:
- *         description: Unauthorized
- *       500:
- *         description: Internal server error
- */
 async function GetBookReviews(req, res) {
   try {
     // const CheckUser = await CheckForUser(req, res);
@@ -288,66 +167,6 @@ async function GetBookReviews(req, res) {
 
 }
 
-/**
- * @swagger
- * /api/Review/{id}:
- *   put:
- *     summary: Update a review
- *     tags: [Reviews]
- *     security:
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Review ID
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               Rating:
- *                 type: integer
- *                 minimum: 1
- *                 maximum: 10
- *                 description: Updated rating
- *               Review:
- *                 type: string
- *                 maxLength: 1000
- *                 description: Updated review text
- *             oneOf:
- *               - required: [Rating]
- *               - required: [Review]
- *     responses:
- *       200:
- *         description: Review updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 reviewId:
- *                   type: string
- *                 rating:
- *                   type: integer
- *                 review:
- *                   type: string
- *       400:
- *         description: Validation error
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden
- *       404:
- *         description: Review not found
- *       500:
- *         description: Internal server error
- */
 async function EditReview(req, res) {
   try {
     // const CheckUser = await CheckForUser(req, res);
@@ -479,42 +298,6 @@ try {
   }
 }
 
-/**
- * @swagger
- * /api//Reviews{id}:
- *   delete:
- *     summary: Delete a review
- *     tags: [Reviews]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Review ID
- *     responses:
- *       200:
- *         description: Review deleted successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *       400:
- *         description: Validation error
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden
- *       404:
- *         description: Review not found
- *       500:
- *         description: Internal server error
- */
 async function DeleteReview(req, res) {
   try {
     // const CheckUser = await CheckForUser(req, res);
