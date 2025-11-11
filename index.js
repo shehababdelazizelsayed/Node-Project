@@ -1,4 +1,3 @@
-
 const dotenv = require("dotenv");
 dotenv.config();
 
@@ -50,18 +49,20 @@ const {
   VerifyEmail,
   ForgotPassword,
   ResetPassword,
-  ChangeUserRole
+  ChangeUserRole,
 } = require("./Controllers/Users.Controller");
 const {
   AddBook,
   GetBooks,
   UpdateBooks,
   DeleteBook,
+  GetBookById,
 } = require("./Controllers/Books.Controller");
 const {
   AddToCart,
   GetCart,
   RemoveFromCart,
+  UpdateCartItem,
 } = require("./Controllers/Carts.Controller");
 const { CreateOrder, GetOrders } = require("./Controllers/Orders.Controller");
 const {
@@ -85,7 +86,6 @@ mongoose
 const { getClient } = require("./utils/redis");
 app.set("redis", getClient());
 
-
 //  Users Routes
 app.post("/api/Users/Register", UserRegister);
 app.post("/api/Users/Login", UserLogin);
@@ -97,6 +97,7 @@ app.patch("/api/Users/Profile", authMiddleware, UserUpdate);
 
 // Books Routes
 app.get("/api/Books", GetBooks);
+app.get("/api/Books/:id", GetBookById);
 app.post(
   "/api/Books",
   authMiddleware,
@@ -124,6 +125,7 @@ app.delete(
 app.post("/api/Cart", authMiddleware, AddToCart);
 app.get("/api/Cart", authMiddleware, GetCart);
 app.delete("/api/Cart/:id", authMiddleware, RemoveFromCart);
+app.put("/api/Cart/", authMiddleware, UpdateCartItem);
 
 //  Orders Routes
 app.post("/api/Orders", authMiddleware, CreateOrder);

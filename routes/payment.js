@@ -1,11 +1,19 @@
+// Stripe webhook endpoint (no auth, raw body required)
 const express = require("express");
 const router = express.Router();
 const { authMiddleware } = require("../Helpers/auth.middleware");
 const {
   createPaymentIntent,
   processPayment,
+  verifySession,
 } = require("../Controllers/payment.Controller");
 
+const { stripeWebhook } = require("../Controllers/payment.Controller");
+router.post(
+  "/webhook",
+  express.raw({ type: "application/json" }),
+  stripeWebhook
+);
 /**
  * @swagger
  * /api/payment/create-payment-intent:
@@ -80,6 +88,9 @@ const {
 // Create payment intent
 router.post("/create-payment-intent", authMiddleware, createPaymentIntent);
 
+// Verify a Stripe Checkout session and create order if paid
+router.post("/verify-session", authMiddleware, verifySession);
+
 /**
  * @swagger
  * /api/payment/process-payment:
@@ -94,22 +105,31 @@ router.post("/create-payment-intent", authMiddleware, createPaymentIntent);
  *         application/json:
  *           schema:
  *             type: object
+/**
+ * @swagger
+ * /api/payment/create-payment-intent:
+ *   post:
+ *     summary: Create a Stripe Checkout session for book purchase (UI redirect)
+ *     tags: [Payment]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
  *             required:
- *               - paymentIntentId
- *               - paymentMethodId
+ *               - CartId
  *             properties:
- *               paymentIntentId:
+ *               CartId:
  *                 type: string
- *                 description: Stripe payment intent ID
- *               paymentMethodId:
- *                 type: string
- *                 description: Stripe payment method ID
+ *                 description: The MongoDB ObjectId of the user's cart
  *             example:
- *               paymentIntentId: "pi_1234567890"
- *               paymentMethodId: "pm_1234567890"
+ *               CartId: "67a34c98b1d3f905ea5d4a11"
  *     responses:
- *       201:
- *         description: Payment confirmed and order created successfully
+ *       200:
+ *         description: Stripe Checkout session created
  *         content:
  *           application/json:
  *             schema:
@@ -117,23 +137,33 @@ router.post("/create-payment-intent", authMiddleware, createPaymentIntent);
  *               properties:
  *                 message:
  *                   type: string
- *                 orderId:
+ *                 url:
  *                   type: string
- *                   description: Order ID
- *                 total:
+ *                   description: Stripe Checkout session URL for redirect
+ *                 sessionId:
+ *                   type: string
+ *                   description: Stripe Checkout session ID
+ *                 amount:
  *                   type: number
- *                   description: Total amount
- *                 paymentIntentId:
- *                   type: string
- *                   description: Stripe payment intent ID
- *                 status:
- *                   type: string
- *                   description: Order status
- *                 paymentStatus:
- *                   type: string
- *                   description: Payment status
+ *                   description: Total amount in dollars
+ *                 amountInCents:
+ *                   type: integer
+ *                   description: Total amount in cents
+ *                 books:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       bookId:
+ *                         type: string
+ *                       title:
+ *                         type: string
+ *                       quantity:
+ *                         type: integer
+ *                       price:
+ *                         type: number
  *       400:
- *         description: Validation error, payment failed, or order already exists
+ *         description: Validation error or insufficient stock
  *         content:
  *           application/json:
  *             schema:
@@ -141,12 +171,10 @@ router.post("/create-payment-intent", authMiddleware, createPaymentIntent);
  *       401:
  *         description: Unauthorized
  *       404:
- *         description: User not found
+ *         description: Book not found
  *       500:
  *         description: Internal server error
  */
 
-// Process payment and create order
-router.post("/process-payment", authMiddleware, processPayment);
-
+// Ensure router is exported for Express
 module.exports = router;

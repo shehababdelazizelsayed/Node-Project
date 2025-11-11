@@ -4,13 +4,16 @@ const jwt = require("jsonwebtoken");
 const config = require("../config/config");
 
 async function generateToken(user) {
-  return jwt.sign({
+  return jwt.sign(
+    {
       userId: user._id,
       email: user.Email,
-      Role: user.Role
+      Role: user.Role,
+      Name: user.Name,
     },
-    config.JWT_SECRET, {
-      expiresIn: config.JWT_EXPIRATION
+    config.JWT_SECRET,
+    {
+      expiresIn: config.JWT_EXPIRATION,
     }
   );
 }
@@ -21,23 +24,23 @@ async function CheckForUser(req, res) {
 
   if (!Email) {
     res.status(401).json({
-      message: "Email is required"
+      message: "Email is required",
     });
     return null;
   }
   if (!Password) {
     res.status(401).json({
-      message: "Password is required"
+      message: "Password is required",
     });
     return null;
   }
 
   const user = await User.findOne({
-    Email
+    Email,
   });
   if (!user) {
     res.status(401).json({
-      message: "Invalid credentials"
+      message: "Invalid credentials",
     });
     return null;
   }
@@ -45,7 +48,7 @@ async function CheckForUser(req, res) {
   const isValidPassword = await bcrypt.compare(Password, user.Password);
   if (!isValidPassword) {
     res.status(401).json({
-      message: "Invalid credentials"
+      message: "Invalid credentials",
     });
     return null;
   }
@@ -53,10 +56,10 @@ async function CheckForUser(req, res) {
   const token = await generateToken(user);
   return {
     user,
-    token
+    token,
   };
 }
 
 module.exports = {
-  CheckForUser
+  CheckForUser,
 };

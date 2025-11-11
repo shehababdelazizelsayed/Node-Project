@@ -35,10 +35,8 @@
 
 const Cart = require("../models/Cart");
 const Book = require("../models/Book");
-const {
-  CheckForUser
-} = require("../Helpers/Login.Helper");
-const Joi = require('joi');
+const { CheckForUser } = require("../Helpers/Login.Helper");
+const Joi = require("joi");
 
 /**
  * @swagger
@@ -100,7 +98,7 @@ async function AddToCart(req, res) {
         .pattern(/^[0-9a-fA-F]{24}$/)
         .required()
         .messages({
-          'string.pattern.base': 'BookId must be a valid ObjectId'
+          "string.pattern.base": "BookId must be a valid ObjectId",
         }),
       Qty: Joi.number().integer().min(1).max(999).default(1),
     });
@@ -108,35 +106,25 @@ async function AddToCart(req, res) {
     const emptySchema = Joi.object({}).unknown(false);
 
     ////////////////////////////////////////////////////////
-    const {
-      error,
-      value
-    } = schema.validate(req.body, {
+    const { error, value } = schema.validate(req.body, {
       abortEarly: false,
       stripUnknown: true,
     });
 
-
-
     if (error) {
       return res.status(400).json({
-        message: 'Validation error',
-        errors: error.details.map(d => d.message.replace(/"/g, '')),
+        message: "Validation error",
+        errors: error.details.map((d) => d.message.replace(/"/g, "")),
       });
     }
 
-
-
-    const {
-      BookId,
-      Qty
-    } = value;
+    const { BookId, Qty } = value;
     ////////////////////////////////////////////////////////
 
-    const GetBook = await Book.findById(BookId)
+    const GetBook = await Book.findById(BookId);
     if (!GetBook) {
       return res.status(404).json({
-        message: "Book not found"
+        message: "Book not found",
       });
     }
 
@@ -148,41 +136,40 @@ async function AddToCart(req, res) {
     }
     if (GetBook.Stock < QtyNum) {
       return res.status(405).json({
-        message: "Out of Stock"
+        message: "Out of Stock",
       });
     }
     let SelectCart = await Cart.findOne({
-      User: req.user.userId
+      User: req.user.userId,
     });
     if (!SelectCart) {
       SelectCart = await Cart.create({
         User: req.user.userId,
-        Items: [{
-          Book: GetBook._id,
-          Quantity: QtyNum
-        }],
+        Items: [
+          {
+            Book: GetBook._id,
+            Quantity: QtyNum,
+          },
+        ],
       });
       /////
-      const Result = await Cart.findById(SelectCart._id)
-        .populate({
-          path: "Items.Book",
-          select: "Title Stock Price Image Category"
-        })
-
+      const Result = await Cart.findById(SelectCart._id).populate({
+        path: "Items.Book",
+        select: "Title Stock Price Image Category",
+      });
 
       return res.status(201).json({
         message: "Added to cart",
-        Cart: Result
+        Cart: Result,
       });
     }
-
 
     const item = SelectCart.Items.find((Item) => Item.Book.equals(GetBook._id));
     if (item) {
       const newQty = item.Quantity + QtyNum;
       if (newQty > GetBook.Stock) {
         return res.status(405).json({
-          message: "Out of Stock"
+          message: "Out of Stock",
         });
       }
 
@@ -190,33 +177,31 @@ async function AddToCart(req, res) {
     } else {
       if (QtyNum > GetBook.Stock) {
         return res.status(405).json({
-          message: "Out of Stock"
+          message: "Out of Stock",
         });
       }
 
       SelectCart.Items.push({
         Book: GetBook._id,
-        Quantity: QtyNum
+        Quantity: QtyNum,
       });
     }
 
-
     await SelectCart.save();
 
-    const Result = await Cart.findById(SelectCart._id)
-      .populate({
-        path: "Items.Book",
-        select: "Title Stock Price Image Category"
-      })
-    console.log(Result)
+    const Result = await Cart.findById(SelectCart._id).populate({
+      path: "Items.Book",
+      select: "Title Stock Price Image Category",
+    });
+    console.log(Result);
     return res.status(201).json({
       message: "Added to cart",
-      Cart: Result
+      Cart: Result,
     });
   } catch (error) {
     console.error("AddToCart:", error);
     res.status(500).json({
-      message: error.message
+      message: error.message,
     });
   }
 }
@@ -269,36 +254,34 @@ async function GetCart(req, res) {
       const errors = []
         .concat(bodyCheck.error ? bodyCheck.error.details : [])
         .concat(queryCheck.error ? queryCheck.error.details : [])
-        .map(d => d.message.replace(/"/g, ''));
+        .map((d) => d.message.replace(/"/g, ""));
       return res.status(400).json({
-        message: 'Validation error',
-        errors
+        message: "Validation error",
+        errors,
       });
     }
 
     let SelectCart = await Cart.findOne({
-        User: req.user.userId
-      })
-      .populate({
-        path: "Items.Book",
-        select: "Title Price Stock Image Category"
-      })
+      User: req.user.userId,
+    }).populate({
+      path: "Items.Book",
+      select: "Title Price Stock Image Category",
+    });
     if (!SelectCart) {
       return res.status(404).json({
-        message: "Cart not Found"
+        message: "Cart not Found",
       });
     }
     return res.status(200).json({
       message: "Cart is Found ",
-      Cart: SelectCart
+      Cart: SelectCart,
     });
   } catch (error) {
     console.error("GetCart:", error);
     res.status(500).json({
-      message: error.message
+      message: error.message,
     });
   }
-
 }
 /**
  * @swagger
@@ -336,79 +319,108 @@ async function GetCart(req, res) {
  *       500:
  *         description: Internal server error
  */
-async function RemoveFromCart(req, res) {
+const RemoveFromCart = async (req, res) => {
   try {
-    // const CheckUser = await CheckForUser(req, res);
-    // if (!CheckUser) return;
-    const schema = Joi.object({
-      id: Joi.string().hex().length(24).required()
-    });
-    const {
-      error,
-      value
-    } = schema.validate(req.params, {
-      stripUnknown: true
-    });
-    if (error) {
-      return res.status(400).json({
-        message: 'Validation error',
-        errors: error.details.map(d => d.message)
-      });
+    const userId = req.user.userId;
+    const { id: BookId } = req.params;
+
+    if (!BookId) {
+      return res.status(400).json({ message: "BookId is required" });
     }
 
-    const {
-      id: BookId
-    } = value;
-
-    const SelectCart = await Cart.findOne({
-      User: req.user.userId
-    });
-    if (!SelectCart) {
-      return res.status(404).json({
-        message: "Cart not found"
-      });
+    const cart = await Cart.findOne({ User: req.user.userId });
+    if (!cart) {
+      return res.status(404).json({ message: "Cart not found" });
     }
 
-    // const CheckItem = SelectCart.Items.length;
-
-
-    const index = SelectCart.Items.findIndex(item => item.Book.equals(BookId));
+    const index = cart.Items.findIndex(
+      (item) => item.Book.toString() === BookId
+    );
     if (index === -1) {
-      return res.status(404).json({
-        message: "Book not found in cart"
-      });
+      return res.status(404).json({ message: "Book not found in cart" });
     }
 
+    cart.Items.splice(index, 1);
+    await cart.save();
 
+    const result = await Cart.findById(cart._id).populate({
+      path: "Items.Book",
+      select: "Title Price Stock Image Category",
+    });
 
-    SelectCart.Items.splice(index, 1);
-    await SelectCart.save();
-
-
-
-
-    const Result = await Cart.findById(SelectCart._id)
-      .populate({
-        path: "Items.Book",
-        select: "Title Price Stock Image Category"
-      })
-
-
-    return res.status(200).json({
+    res.status(200).json({
       message: "Removed from cart",
-      Cart: Result
+      Cart: result,
     });
   } catch (error) {
-
-    console.error("RemoveFromCart:", error);
-    return res.status(500).json({
-      message: error.message
-    });
+    console.error("RemoveFromCart error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
   }
-}
+};
+
+/**
+ * @swagger
+ * /api/Cart/{id}:
+ *   put:
+ *     summary: Update quantity of a book in the cart
+ *     tags: [Carts]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Book ID in the cart
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - Quantity
+ *             properties:
+ *               Quantity:
+ *                 type: integer
+ *                 minimum: 1
+ */
+const UpdateCartItem = async (req, res) => {
+  try {
+    const userId = req.user.userId; // must match your other functions
+    const { BookId, Quantity } = req.body;
+
+    if (!BookId) return res.status(400).json({ message: "BookId is required" });
+    if (!Quantity || Quantity < 1)
+      return res.status(400).json({ message: "Quantity must be >= 1" });
+
+    const cart = await Cart.findOne({ User: userId }).populate(
+      "Items.Book",
+      "Title Price Stock"
+    );
+    if (!cart) return res.status(404).json({ message: "Cart not found" });
+
+    const item = cart.Items.find((i) => i.Book._id.toString() === BookId);
+    if (!item) return res.status(404).json({ message: "Book not in cart" });
+
+    if (item.Book.Stock < Quantity) {
+      return res.status(400).json({ message: "Not enough stock" });
+    }
+
+    item.Quantity = Quantity;
+    await cart.save();
+
+    res.json({ message: "Cart updated", Cart: cart });
+  } catch (err) {
+    console.error("UpdateCartItem error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
 
 module.exports = {
   AddToCart,
   GetCart,
-  RemoveFromCart
-}
+  RemoveFromCart,
+  UpdateCartItem,
+};

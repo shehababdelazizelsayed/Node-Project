@@ -52,12 +52,12 @@
  *         Owner: userId
  */
 const Book = require("../models/Book");
-const Joi = require('joi');
+const Joi = require("joi");
 const cloudinary = require("../Helpers/cloudinary");
-const fs = require('fs');
-const Review = require("../models/Review")
-const mongoose = require('mongoose');
-const userColl = mongoose.model('User').collection.name;
+const fs = require("fs");
+const Review = require("../models/Review");
+const mongoose = require("mongoose");
+const userColl = mongoose.model("User").collection.name;
 const { getCache, setCache, deleteCache } = require("../utils/redis");
 /**
  * @swagger
@@ -131,41 +131,29 @@ const { getCache, setCache, deleteCache } = require("../utils/redis");
 // Add
 async function AddBook(req, res) {
   try {
-
     const schema = Joi.object({
       Title: Joi.string().trim().min(1).required(),
       Author: Joi.string().trim().min(1).required(),
       Price: Joi.number().min(0).required(),
       Description: Joi.string().trim().min(1).required(),
       Stock: Joi.number().integer().min(0).default(0),
-      Image: Joi.string().trim().uri().allow('', null),
+      Image: Joi.string().trim().uri().allow("", null),
       Category: Joi.string().trim().min(1).required(),
-      Pdf: Joi.string().trim().uri().allow('', null),
+      Pdf: Joi.string().trim().uri().allow("", null),
     });
 
-    const {
-      error,
-      value
-    } = schema.validate(req.body, {
+    const { error, value } = schema.validate(req.body, {
       abortEarly: false,
-      stripUnknown: true
+      stripUnknown: true,
     });
     if (error) {
       return res.status(400).json({
-        message: 'Validation error',
-        errors: error.details.map(d => d.message.replace(/"/g, ''))
+        message: "Validation error",
+        errors: error.details.map((d) => d.message.replace(/"/g, "")),
       });
     }
-    const {
-      Title,
-      Author,
-      Price,
-      Description,
-      Stock,
-      Image,
-      Category,
-      Pdf
-    } = value;
+    const { Title, Author, Price, Description, Stock, Image, Category, Pdf } =
+      value;
 
     let pdfUrl = Pdf;
     let imageUrl = Image;
@@ -175,7 +163,7 @@ async function AddBook(req, res) {
       try {
         const result = await cloudinary.uploader.upload(req.files.pdf[0].path, {
           resource_type: "auto",
-          folder: "books/pdfs"
+          folder: "books/pdfs",
         });
         pdfUrl = result.secure_url;
         fs.unlinkSync(req.files.pdf[0].path); // Remove local file after upload
@@ -183,7 +171,7 @@ async function AddBook(req, res) {
         console.error("Cloudinary PDF upload error:", uploadError);
         return res.status(500).json({
           message: "Failed to upload PDF to Cloudinary",
-          error: uploadError.message
+          error: uploadError.message,
         });
       }
     }
@@ -191,28 +179,29 @@ async function AddBook(req, res) {
     if (req.files && req.files.image && req.files.image[0]) {
       console.log("req.files.image:", req.files.image[0]);
       try {
-        const result = await cloudinary.uploader.upload(req.files.image[0].path, {
-          resource_type: "auto",
-          folder: "books/images"
-        });
+        const result = await cloudinary.uploader.upload(
+          req.files.image[0].path,
+          {
+            resource_type: "auto",
+            folder: "books/images",
+          }
+        );
         imageUrl = result.secure_url;
         fs.unlinkSync(req.files.image[0].path); // Remove local file after upload
       } catch (uploadError) {
         console.error("Cloudinary image upload error:", uploadError);
         return res.status(500).json({
           message: "Failed to upload image to Cloudinary",
-          error: uploadError.message
+          error: uploadError.message,
         });
       }
     }
-
 
     // if (!Title || !Author || !Price || !Description || !Category) {
     //   return res.status(400).json({
     //     message: "Title, Author, Price , Description , Category are required",
     //   });
     // }
-
 
     // if (Number(Price) < 0) {
     //   return res.status(400).json({
@@ -225,7 +214,6 @@ async function AddBook(req, res) {
     //     message: "Stock must be >= 0"
     //   });
     // }
-
 
     const CreateBook = await Book.create({
       Title,
@@ -240,20 +228,19 @@ async function AddBook(req, res) {
     });
 
     // Invalidate cache for books list
-    await deleteCache('books:*');
+    await deleteCache("books:*");
 
     return res.status(201).json({
       message: "Book created successfully",
-      Book: CreateBook
+      Book: CreateBook,
     });
-
   } catch (error) {
     console.error("addBook:", error);
     return res.status(500).json({
-      message: error.message
+      message: error.message,
     });
   }
-};
+}
 
 /**
  * @swagger
@@ -322,20 +309,18 @@ async function AddBook(req, res) {
 // Update
 async function UpdateBooks(req, res) {
   try {
-
     const paramsSchema = Joi.object({
-      id: Joi.string().hex().length(24).required()
+      id: Joi.string().hex().length(24).required(),
     });
     const vParams = paramsSchema.validate(req.params, {
-      stripUnknown: true
+      stripUnknown: true,
     });
-    if (vParams.error) return res.status(400).json({
-      message: 'Invalid id'
-    });
+    if (vParams.error)
+      return res.status(400).json({
+        message: "Invalid id",
+      });
 
-    const {
-      id
-    } = vParams.value;
+    const { id } = vParams.value;
 
     const GetThisBook = await Book.findById(id);
 
@@ -347,13 +332,13 @@ async function UpdateBooks(req, res) {
 
     if (!GetThisBook) {
       return res.status(404).json({
-        message: "Book not found"
+        message: "Book not found",
       });
     }
 
     if (req.user.Role !== "Admin" && GetThisBook.Owner !== req.user.userId) {
       return res.status(403).json({
-        message: "You are not allowed to edit this book"
+        message: "You are not allowed to edit this book",
       });
     }
 
@@ -364,21 +349,20 @@ async function UpdateBooks(req, res) {
       Stock: Joi.number().integer().min(0),
       Category: Joi.string().trim().min(1),
       Description: Joi.string().trim().min(1),
-      Image: Joi.string().trim().uri().allow(''),
-      Pdf: Joi.string().trim().uri().allow(''),
+      Image: Joi.string().trim().uri().allow(""),
+      Pdf: Joi.string().trim().uri().allow(""),
     }).min(1);
 
     const vBody = bodySchema.validate(req.body, {
       abortEarly: false,
-      stripUnknown: true
+      stripUnknown: true,
     });
     if (vBody.error) {
       return res.status(400).json({
-        message: 'No fields to update',
-        errors: vBody.error.details.map(d => d.message.replace(/"/g, ''))
+        message: "No fields to update",
+        errors: vBody.error.details.map((d) => d.message.replace(/"/g, "")),
       });
     }
-
 
     // const allowed = [
     //   "Title",
@@ -392,7 +376,7 @@ async function UpdateBooks(req, res) {
     // ];
 
     const Update = {
-      ...vBody.value
+      ...vBody.value,
     };
     // for (const key of allowed) {
     //   if (req.body[key] != null) Update[key] = req.body[key];
@@ -416,23 +400,21 @@ async function UpdateBooks(req, res) {
 
     const updatedBook = await Book.findByIdAndUpdate(id, Update, {
       new: true,
-      runValidators: true
-
+      runValidators: true,
     });
 
     // Invalidate cache for books list
-    await deleteCache('books:*');
+    await deleteCache("books:*");
 
     return res.status(200).json({
       message: "Book updated successfully",
-      Book: updatedBook
+      Book: updatedBook,
     });
-
   } catch (error) {
     console.error("UpdateBook", error);
 
     return res.status(500).json({
-      message: error.message
+      message: error.message,
     });
   }
 }
@@ -480,18 +462,16 @@ async function UpdateBooks(req, res) {
 async function DeleteBook(req, res) {
   try {
     const paramsSchema = Joi.object({
-      id: Joi.string().hex().length(24).required()
+      id: Joi.string().hex().length(24).required(),
     });
     const vParams = paramsSchema.validate(req.params, {
-      stripUnknown: true
+      stripUnknown: true,
     });
-    if (vParams.error) return res.status(400).json({
-      message: 'Invalid id'
-    });
-    const {
-      id
-    } = vParams.value;
-
+    if (vParams.error)
+      return res.status(400).json({
+        message: "Invalid id",
+      });
+    const { id } = vParams.value;
 
     // const Deleted = await Book.findByIdAndDelete(id);
 
@@ -504,31 +484,29 @@ async function DeleteBook(req, res) {
     // if (req.user.Role !== "Admin" && CreateBook.Owner.toString() !== req.user.userId) {
     const GetThisBook = await Book.findById(id);
     if (!GetThisBook) {
-
       return res.status(404).json({
-        message: "Book not found"
+        message: "Book not found",
       });
     }
 
     if (req.user.Role !== "Admin" && GetThisBook.Owner !== req.user.userId) {
       return res.status(403).json({
-        message: "You are not allowed to delete this book"
+        message: "You are not allowed to delete this book",
       });
     }
     const Deleted = await Book.findByIdAndDelete(id);
 
     // Invalidate cache for books list
-    await deleteCache('books:*');
+    await deleteCache("books:*");
 
     return res.status(200).json({
       message: "Book deleted successfully",
-      Book: Deleted
+      Book: Deleted,
     });
-
   } catch (error) {
     console.error("DeleteBook:", error);
     return res.status(500).json({
-      message: error.message
+      message: error.message,
     });
   }
 }
@@ -620,30 +598,29 @@ async function GetBooks(req, res) {
 
     const schema = Joi.object({
       page: Joi.number().integer().min(1).default(1),
-      limit: Joi.number().integer().min(2).max(100).default(2),
-      sort: Joi.string().valid('Title', 'Price', 'Stock', 'createdAt').default('createdAt'),
-      order: Joi.string().valid('asc', 'desc').default('desc'),
-      search: Joi.string().trim().allow(''),
-      Category: Joi.string().trim().allow(''),
+      limit: Joi.number().integer().min(2).max(100).default(4),
+      sort: Joi.string()
+        .valid("Title", "Price", "Stock", "createdAt")
+        .default("createdAt"),
+      order: Joi.string().valid("asc", "desc").default("desc"),
+      search: Joi.string().trim().allow(""),
+      Category: Joi.string().trim().allow(""),
       priceMin: Joi.number().min(0),
       priceMax: Joi.number().min(0),
       inStock: Joi.boolean(),
-        withReviews: Joi.boolean().default(false),
-  reviewLimit: Joi.number().integer().min(1).max(50).default(3),
-  withStats: Joi.boolean().default(false),
-  withLastReview: Joi.boolean().default(true)
+      withReviews: Joi.boolean().default(false),
+      reviewLimit: Joi.number().integer().min(1).max(50).default(3),
+      withStats: Joi.boolean().default(false),
+      withLastReview: Joi.boolean().default(true),
     }).unknown(false);
 
-    const {
-      error,
-      value
-    } = schema.validate(req.query, {
-      stripUnknown: true
+    const { error, value } = schema.validate(req.query, {
+      stripUnknown: true,
     });
     if (error) {
       return res.status(400).json({
-        message: 'Validation error',
-        errors: error.details.map(val => val.message.replace(/"/g, ''))
+        message: "Validation error",
+        errors: error.details.map((val) => val.message.replace(/"/g, "")),
       });
     }
 
@@ -655,33 +632,37 @@ async function GetBooks(req, res) {
     // Check cache first
     const cachedData = await getCache(cacheKey);
     if (cachedData) {
-      console.log('Cache hit for books');
+      console.log("Cache hit for books");
       return res.status(200).json(cachedData);
     }
-    console.log('Cache miss for books');
+    console.log("Cache miss for books");
     const limit = query.limit;
     const page = query.page;
     const skip = (page - 1) * limit;
-    if (query.priceMin != null && query.priceMax != null && query.priceMin > query.priceMax) {
-
+    if (
+      query.priceMin != null &&
+      query.priceMax != null &&
+      query.priceMin > query.priceMax
+    ) {
       return res.status(400).json({
-        message: 'priceMin cannot be greater than priceMax'
+        message: "priceMin cannot be greater than priceMax",
       });
     }
     //  filter
     const filter = {};
     if (query.search) {
-      filter.$or = [{
+      filter.$or = [
+        {
           Title: {
             $regex: query.search,
-            $options: 'i'
-          }
+            $options: "i",
+          },
         },
         {
           Author: {
             $regex: query.search,
-            $options: 'i'
-          }
+            $options: "i",
+          },
         },
       ];
     }
@@ -691,123 +672,138 @@ async function GetBooks(req, res) {
       if (query.priceMin != null) filter.Price.$gte = query.priceMin;
       if (query.priceMax != null) filter.Price.$lte = query.priceMax;
     }
-    if (query.inStock === true) filter.Stock = {
-      $gt: 0
-    };
+    if (query.inStock === true)
+      filter.Stock = {
+        $gt: 0,
+      };
 
     // sort
-    const sortDir = query.order === 'asc' ? 1 : -1;
+    const sortDir = query.order === "asc" ? 1 : -1;
     const sortObj = {
-      [query.sort]: sortDir
+      [query.sort]: sortDir,
     };
 
     const total = await Book.countDocuments(filter);
-      let booksQuery = Book.find(filter, value.withReviews ? undefined : { Reviews: 0 })
+    let booksQuery = Book.find(
+      filter,
+      value.withReviews ? undefined : { Reviews: 0 }
+    )
       .sort(sortObj)
       .skip(skip)
       .limit(limit);
     if (value.withReviews) {
-  booksQuery = booksQuery.populate({
-    path: 'Reviews',
-    select: 'User Rating Review createdAt',
-    options: { sort: { createdAt: -1 }, limit: value.reviewLimit },
-    populate: { path: 'User', select: 'Name', options: { lean: true } },
-  });
-}
+      booksQuery = booksQuery.populate({
+        path: "Reviews",
+        select: "User Rating Review createdAt",
+        options: { sort: { createdAt: -1 }, limit: value.reviewLimit },
+        populate: { path: "User", select: "Name", options: { lean: true } },
+      });
+    }
 
-let books = await booksQuery.lean();
+    let books = await booksQuery.lean();
 
-function formatReviewForClient(reviewDoc) {
-  return {
-    User: { Name: reviewDoc?.User?.Name ?? null },
-    Rating: reviewDoc.Rating,
-    Review: reviewDoc.Review,
-    createdAt: reviewDoc.createdAt,
-  };
-}
-
-function normalizeBookReviews(book) {
-  if (!Array.isArray(book.Reviews) || book.Reviews.length === 0) {
-    delete book.Reviews;
-    return book;
-  }
-  book.Reviews = book.Reviews.map(formatReviewForClient);
-  return book;
-}
-
-async function computeStatsForBooks(bookIds, usersCollectionName, ReviewModel) {
-  const aggregationRows = await ReviewModel.aggregate([
-    { $match: { Book: { $in: bookIds } } },
-    { $sort: { createdAt: -1 } },
-    {
-      $group: {
-        _id: '$Book',
-        avgRating: { $avg: '$Rating' },
-        reviewsCount: { $sum: 1 },
-        lastReview: { $first: '$$ROOT' },
-      },
-    },
-    {
-      $lookup: {
-        from: usersCollectionName,
-        localField: 'lastReview.User',
-        foreignField: '_id',
-        as: 'lastUser',
-        pipeline: [{ $project: { _id: 0, Name: 1 } }],
-      },
-    },
-    {
-      $project: {
-        avgRating: 1,
-        reviewsCount: 1,
-        lastReview: {
-          rating: '$lastReview.Rating',
-          review: '$lastReview.Review',
-          createdAt: '$lastReview.createdAt',
-          userName: { $ifNull: [{ $arrayElemAt: ['$lastUser.Name', 0] }, null] },
-        },
-      },
-    },
-  ]);
-
-  const statsByIdMap = {};
-  for (const row of aggregationRows) statsByIdMap[String(row._id)] = row;
-  return statsByIdMap;
-}
-
-function attachStats(booksList, statsByIdMap, { withStats, withLastReview }) {
-  const DEFAULT_AVG = 3;
-  return booksList.map((book) => {
-    const stat = statsByIdMap[String(book._id)];
-    if (withStats) {
-      const avg = stat ? Number((stat.avgRating ?? 0).toFixed(2)) : DEFAULT_AVG;
-      book.stats = {
-        avgRating: avg,
-        reviewsCount: stat ? stat.reviewsCount : 0,
-        isDefaultAvg: !stat,
+    function formatReviewForClient(reviewDoc) {
+      return {
+        User: { Name: reviewDoc?.User?.Name ?? null },
+        Rating: reviewDoc.Rating,
+        Review: reviewDoc.Review,
+        createdAt: reviewDoc.createdAt,
       };
     }
-    if (withLastReview) {
-      book.lastReview = stat ? stat.lastReview : null;
+
+    function normalizeBookReviews(book) {
+      if (!Array.isArray(book.Reviews) || book.Reviews.length === 0) {
+        delete book.Reviews;
+        return book;
+      }
+      book.Reviews = book.Reviews.map(formatReviewForClient);
+      return book;
     }
-    return book;
-  });
-}
 
-if (value.withReviews) {
-  books = books.map(normalizeBookReviews);
-}
+    async function computeStatsForBooks(
+      bookIds,
+      usersCollectionName,
+      ReviewModel
+    ) {
+      const aggregationRows = await ReviewModel.aggregate([
+        { $match: { Book: { $in: bookIds } } },
+        { $sort: { createdAt: -1 } },
+        {
+          $group: {
+            _id: "$Book",
+            avgRating: { $avg: "$Rating" },
+            reviewsCount: { $sum: 1 },
+            lastReview: { $first: "$$ROOT" },
+          },
+        },
+        {
+          $lookup: {
+            from: usersCollectionName,
+            localField: "lastReview.User",
+            foreignField: "_id",
+            as: "lastUser",
+            pipeline: [{ $project: { _id: 0, Name: 1 } }],
+          },
+        },
+        {
+          $project: {
+            avgRating: 1,
+            reviewsCount: 1,
+            lastReview: {
+              rating: "$lastReview.Rating",
+              review: "$lastReview.Review",
+              createdAt: "$lastReview.createdAt",
+              userName: {
+                $ifNull: [{ $arrayElemAt: ["$lastUser.Name", 0] }, null],
+              },
+            },
+          },
+        },
+      ]);
 
-const needStats = books.length && (value.withStats || value.withLastReview);
-if (needStats) {
-  const bookIds = books.map((book) => book._id);
-  const statsById = await computeStatsForBooks(bookIds, userColl, Review);
-  books = attachStats(books, statsById, {
-    withStats: value.withStats,
-    withLastReview: value.withLastReview,
-  });
-}
+      const statsByIdMap = {};
+      for (const row of aggregationRows) statsByIdMap[String(row._id)] = row;
+      return statsByIdMap;
+    }
 
+    function attachStats(
+      booksList,
+      statsByIdMap,
+      { withStats, withLastReview }
+    ) {
+      const DEFAULT_AVG = 3;
+      return booksList.map((book) => {
+        const stat = statsByIdMap[String(book._id)];
+        if (withStats) {
+          const avg = stat
+            ? Number((stat.avgRating ?? 0).toFixed(2))
+            : DEFAULT_AVG;
+          book.stats = {
+            avgRating: avg,
+            reviewsCount: stat ? stat.reviewsCount : 0,
+            isDefaultAvg: !stat,
+          };
+        }
+        if (withLastReview) {
+          book.lastReview = stat ? stat.lastReview : null;
+        }
+        return book;
+      });
+    }
+
+    if (value.withReviews) {
+      books = books.map(normalizeBookReviews);
+    }
+
+    const needStats = books.length && (value.withStats || value.withLastReview);
+    if (needStats) {
+      const bookIds = books.map((book) => book._id);
+      const statsById = await computeStatsForBooks(bookIds, userColl, Review);
+      books = attachStats(books, statsById, {
+        withStats: value.withStats,
+        withLastReview: value.withLastReview,
+      });
+    }
 
     const response = {
       message: "Books retrieved successfully",
@@ -815,7 +811,7 @@ if (needStats) {
         page,
         limit,
         total,
-        pages: Math.max(1, Math.ceil(total / limit))
+        pages: Math.max(1, Math.ceil(total / limit)),
       },
       books: books,
     };
@@ -827,7 +823,148 @@ if (needStats) {
   } catch (error) {
     console.error("GetBooks:", error);
     return res.status(500).json({
-      message: error.message
+      message: error.message,
+    });
+  }
+}
+
+/**
+ * @swagger
+ * /api/Books/{id}:
+ *   get:
+ *     summary: Get a single book by ID
+ *     tags: [Books]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Book ID
+ *       - in: query
+ *         name: withReviews
+ *         schema:
+ *           type: boolean
+ *           default: false
+ *         description: Include book reviews
+ *       - in: query
+ *         name: reviewLimit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 50
+ *           default: 3
+ *         description: Number of reviews to include
+ *     responses:
+ *       200:
+ *         description: Book retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 book:
+ *                   $ref: '#/components/schemas/Book'
+ *       400:
+ *         description: Invalid ID
+ *       404:
+ *         description: Book not found
+ *       500:
+ *         description: Internal server error
+ */
+async function GetBookById(req, res) {
+  try {
+    // Validate params
+    const paramsSchema = Joi.object({
+      id: Joi.string().hex().length(24).required(),
+    });
+    const vParams = paramsSchema.validate(req.params, {
+      stripUnknown: true,
+    });
+    if (vParams.error) {
+      return res.status(400).json({
+        message: "Invalid id",
+      });
+    }
+
+    // Validate query params
+    const querySchema = Joi.object({
+      withReviews: Joi.boolean().default(false),
+      reviewLimit: Joi.number().integer().min(1).max(50).default(3),
+    });
+    const vQuery = querySchema.validate(req.query, {
+      stripUnknown: true,
+    });
+    if (vQuery.error) {
+      return res.status(400).json({
+        message: "Invalid query parameters",
+        errors: vQuery.error.details.map((d) => d.message.replace(/"/g, "")),
+      });
+    }
+
+    const { id } = vParams.value;
+    const { withReviews, reviewLimit } = vQuery.value;
+
+    // Check cache first
+    const cacheKey = `book:${id}:${withReviews}:${reviewLimit}`;
+    const cachedData = await getCache(cacheKey);
+    if (cachedData) {
+      console.log("Cache hit for single book");
+      return res.status(200).json(cachedData);
+    }
+    console.log("Cache miss for single book");
+
+    // Build query
+    let query = Book.findById(id);
+
+    if (withReviews) {
+      query = query.populate({
+        path: "Reviews",
+        select: "User Rating Review createdAt",
+        options: {
+          sort: { createdAt: -1 },
+          limit: reviewLimit,
+        },
+        populate: {
+          path: "User",
+          select: "Name",
+        },
+      });
+    }
+
+    const book = await query.lean();
+
+    if (!book) {
+      return res.status(404).json({
+        message: "Book not found",
+      });
+    }
+
+    // Format reviews if present
+    if (withReviews && Array.isArray(book.Reviews)) {
+      book.Reviews = book.Reviews.map((review) => ({
+        User: { Name: review?.User?.Name ?? null },
+        Rating: review.Rating,
+        Review: review.Review,
+        createdAt: review.createdAt,
+      }));
+    }
+
+    const response = {
+      message: "Book retrieved successfully",
+      book,
+    };
+
+    // Cache the response
+    await setCache(cacheKey, response, 300); // TTL 5 minutes
+
+    return res.status(200).json(response);
+  } catch (error) {
+    console.error("GetBookById:", error);
+    return res.status(500).json({
+      message: error.message,
     });
   }
 }
@@ -836,5 +973,6 @@ module.exports = {
   AddBook,
   GetBooks,
   UpdateBooks,
-  DeleteBook
+  DeleteBook,
+  GetBookById,
 };

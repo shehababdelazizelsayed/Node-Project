@@ -128,13 +128,9 @@ const UserRegister = async (req, res) => {
         }),
       Token: Joi.string(),
 
-      Role: Joi.string()
-        .valid("User")
-        .empty("")
-        .default("User")
-        .messages({
-          "any.only": "Role must be User ",
-        }),
+      Role: Joi.string().valid("User").empty("").default("User").messages({
+        "any.only": "Role must be User ",
+      }),
     }).xor("Password", "Token");
     const { error, value } = schema.validate(req.body, {
       abortEarly: false,
@@ -182,7 +178,6 @@ const UserRegister = async (req, res) => {
     return res.status(201).json({
       message: "Registration successful",
       user: {
-      
         Name: user.Name,
         Email: user.Email,
         Role: user.Role,
@@ -259,6 +254,7 @@ const UserLogin = async (req, res) => {
         id: user._id,
         Name: user.Name,
         IsVerified: user.IsVerified,
+        Email: user.Email,
       },
       token,
     });
@@ -320,24 +316,28 @@ const UserUpdate = async (req, res) => {
   try {
     const schema = Joi.object({
       Name: Joi.string().trim().min(3).max(30),
-      //Email: Joi.string().lowercase().trim().email({
-      // tlds: {
-      //   allow: false
-      // }
-      //}),
-      NewPassword: Joi.string().min(8).max(64).pattern(/^\S+$/).messages({
-        "string.pattern.base": "NewPassword must be 8–64 chars, no spaces",
-        "string.min": "NewPassword must be at least 8 characters",
-        "string.max": "NewPassword must be at most 64 characters",
+      CurrentPassword: Joi.string().min(8).max(64).pattern(/^\S+$/).messages({
+        "string.pattern.base": "Current password cannot contain spaces",
+        "string.min": "Current password must be at least 8 characters",
+        "string.max": "Current password must be at most 64 characters",
       }),
-      CurrentPassword: Joi.string().min(6).max(64).pattern(/^\S+$/).messages({
-        "string.pattern.base": "CurrentPassword must be 8–64 chars, no spaces",
-        "string.min": "CurrentPassword must be at least 8 characters",
-        "string.max": "CurrentPassword must be at most 64 characters",
+      NewPassword: Joi.string().min(8).max(64).pattern(/^\S+$/).messages({
+        "string.pattern.base": "New password cannot contain spaces",
+        "string.min": "New password must be at least 8 characters",
+        "string.max": "New password must be at most 64 characters",
+      }),
+      ConfirmPassword: Joi.valid(Joi.ref("NewPassword")).messages({
+        "any.only": "New password and confirm password do not match",
       }),
     })
-      .with("NewPassword", "CurrentPassword")
-      .or("Name", "Email", "NewPassword");
+      .when(Joi.object({ NewPassword: Joi.exist() }).unknown(), {
+        then: Joi.object({
+          CurrentPassword: Joi.required(),
+          ConfirmPassword: Joi.required(),
+        }),
+      })
+      .or("Name", "NewPassword");
+
     const { error, value } = schema.validate(req.body, {
       abortEarly: false,
       stripUnknown: true,
@@ -349,89 +349,46 @@ const UserUpdate = async (req, res) => {
         errors: error.details.map((d) => d.message.replace(/"/g, "")),
       });
     }
-    ////////////
-    const userId = req.user.userId; /////
-    const user = await User.findById(userId);
 
+    const userId = req.user.userId;
     if (!userId) {
-      return res.status(401).json({
-        message: "Unauthorized",
-      });
+      return res.status(401).json({ message: "Unauthorized" });
     }
+
+    const user = await User.findById(userId);
     if (!user) {
-      return res.status(401).json({
-        message: "User not found",
-      });
+      return res.status(404).json({ message: "User not found" });
     }
 
     const updates = {};
-    ////////
 
-    if (value.Name == user.Name) {
-      return res.status(402).json({ massage: "you must add New Name " });
+    if (value.Name && value.Name !== user.Name) {
+      updates.Name = value.Name;
     }
-    if (value.Name) {
-      //////
-      updates.Name = value.Name; /////
-    }
-
-    // if (value.Email && value.Email !== user.Email) {
-    //   const emailExists = await User.findOne({
-    //     Email: value.Email.toLowerCase().trim(),
-    //     _id: {
-    //       $ne: userId
-    //     },
-    //   });
-
-    //   if (emailExists) {
-    //     return res.status(400).json({
-    //       message: "Email already in use",
-    //     });
-    //   }
-    //   updates.Email = value.Email.toLowerCase().trim();
-    // }
 
     if (value.NewPassword) {
-      // Require current password for security
-      if (!value.CurrentPassword) {
-        return res.status(400).json({
-          message: "Current password is required to change password",
-        });
-      }
-
-      // Verify current password
-      const isValidPassword = await bcrypt.compare(
+      const isValid = await bcrypt.compare(
         value.CurrentPassword,
         user.Password
       );
-      if (!isValidPassword) {
-        return res.status(401).json({
-          message: "Current password is incorrect",
-        });
+      if (!isValid) {
+        return res
+          .status(401)
+          .json({ message: "Current password is incorrect" });
       }
 
-      // Hash new password
       const salt = await bcrypt.genSalt(10);
       updates.Password = await bcrypt.hash(value.NewPassword, salt);
     }
 
-    // Check if there are any updates
     if (Object.keys(updates).length === 0) {
-      return res.status(400).json({
-        message: "No fields to update",
-      });
+      return res.status(400).json({ message: "No valid fields to update" });
     }
 
-    // Update user
     const updatedUser = await User.findByIdAndUpdate(
       userId,
-      {
-        $set: updates,
-      },
-      {
-        new: true,
-        runValidators: true,
-      }
+      { $set: updates },
+      { new: true, runValidators: true }
     ).select("_id Name Email Role");
 
     return res.status(200).json({
@@ -444,10 +401,8 @@ const UserUpdate = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("UserUpdate:", error);
-    return res.status(500).json({
-      message: error.message,
-    });
+    console.error("UserUpdate error:", error);
+    return res.status(500).json({ message: error.message });
   }
 };
 
@@ -691,13 +646,13 @@ const ChangeUserRole = async (req, res) => {
   try {
     const { id } = req.params;
     const { Role } = req.body;
-    const {Email} = req.body
+    const { Email } = req.body;
 
     const validRoles = ["User", "Owner", "Admin"];
     if (!validRoles.includes(Role)) {
       return res.status(400).json({ message: "Invalid role" });
     }
-     const user = id
+    const user = id
       ? await User.findById(id)
       : await User.findOne({ Email: Email?.toLowerCase().trim() });
 
@@ -711,7 +666,6 @@ const ChangeUserRole = async (req, res) => {
     res.status(200).json({
       message: "User role updated successfully",
       user: {
-        
         Name: user.Name,
         Email: user.Email,
         Role: user.Role,
@@ -730,5 +684,5 @@ module.exports = {
   VerifyEmail,
   ForgotPassword,
   ResetPassword,
-  ChangeUserRole
+  ChangeUserRole,
 };
