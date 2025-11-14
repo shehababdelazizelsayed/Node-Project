@@ -968,6 +968,22 @@ async function GetBookById(req, res) {
     });
   }
 }
+async function getAllBooksAdmin(req, res) {
+  try {
+    const books = await Book.find().sort({ createdAt: -1 }).lean();
+
+    return res.status(200).json({
+      message: "All books retrieved successfully",
+      books,
+    });
+
+  } catch (error) {
+    console.error("getAllBooksAdmin:", error);
+    return res.status(500).json({ message: error.message });
+  }
+}
+
+
 
 module.exports = {
   AddBook,
@@ -975,4 +991,5 @@ module.exports = {
   UpdateBooks,
   DeleteBook,
   GetBookById,
+  getAllBooksAdmin,
 };

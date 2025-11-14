@@ -57,6 +57,7 @@ const {
   UpdateBooks,
   DeleteBook,
   GetBookById,
+  getAllBooksAdmin,
 } = require("./Controllers/Books.Controller");
 const {
   AddToCart,
@@ -74,6 +75,7 @@ const {
 const { getAllBookUsers } = require("./Controllers/BookUsers.Controller");
 const { log } = require("console");
 const { queryBooksWithAI } = require("./Controllers/ai.controller");
+const { getAllUsers, getUserById, deleteUser, changeUserRole } = require('./Controllers/AdminUsers.Controller');
 
 mongoose
   .connect(process.env.Mongo_URL)
@@ -145,6 +147,13 @@ app.patch(
   authMiddleware,
   authorizeRoles("Owner", "Admin"),
   ChangeUserRole
+);
+
+app.get(
+  "/api/Admin/Books",
+  authMiddleware,
+  authorizeRoles("Admin"),
+  getAllBooksAdmin
 );
 
 app.patch(
@@ -237,6 +246,33 @@ app.post("/api/notify", authMiddleware, (req, res) => {
   }
 });
 
+app.get(
+  '/api/Admin/Users',
+  authMiddleware,
+  authorizeRoles('Admin'),
+  getAllUsers
+);
+
+app.get(
+  '/api/Admin/Users/:id',
+  authMiddleware,
+  authorizeRoles('Admin'),
+  getUserById
+);
+
+app.delete(
+  '/api/Admin/Users/:id',
+  authMiddleware,
+  authorizeRoles('Admin'),
+  deleteUser
+);
+
+app.patch(
+  '/api/Admin/Users/role/:id',
+  authMiddleware,
+  authorizeRoles('Admin'),
+  changeUserRole
+);
 // Swagger
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(specs));
 
@@ -249,3 +285,4 @@ server.listen(port, () => {
   console.log(`Swagger docs available at http://localhost:${port}/api-docs`);
 });
 app.post("/api/ai", authMiddleware, queryBooksWithAI);
+
