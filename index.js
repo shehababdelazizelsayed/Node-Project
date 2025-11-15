@@ -75,7 +75,12 @@ const {
 const { getAllBookUsers } = require("./Controllers/BookUsers.Controller");
 const { log } = require("console");
 const { queryBooksWithAI } = require("./Controllers/ai.controller");
-const { getAllUsers, getUserById, deleteUser, changeUserRole } = require('./Controllers/AdminUsers.Controller');
+const {
+  getAllUsers,
+  getUserById,
+  deleteUser,
+  changeUserRole,
+} = require("./Controllers/AdminUsers.Controller");
 
 mongoose
   .connect(process.env.Mongo_URL)
@@ -247,30 +252,30 @@ app.post("/api/notify", authMiddleware, (req, res) => {
 });
 
 app.get(
-  '/api/Admin/Users',
+  "/api/Admin/Users",
   authMiddleware,
-  authorizeRoles('Admin'),
+  authorizeRoles("Admin"),
   getAllUsers
 );
 
 app.get(
-  '/api/Admin/Users/:id',
+  "/api/Admin/Users/:id",
   authMiddleware,
-  authorizeRoles('Admin'),
+  authorizeRoles("Admin"),
   getUserById
 );
 
 app.delete(
-  '/api/Admin/Users/:id',
+  "/api/Admin/Users/:id",
   authMiddleware,
-  authorizeRoles('Admin'),
+  authorizeRoles("Admin"),
   deleteUser
 );
 
 app.patch(
-  '/api/Admin/Users/role/:id',
+  "/api/Admin/Users/role/:id",
   authMiddleware,
-  authorizeRoles('Admin'),
+  authorizeRoles("Admin"),
   changeUserRole
 );
 // Swagger
@@ -284,5 +289,4 @@ server.listen(port, () => {
   console.log("server is running on port " + port);
   console.log(`Swagger docs available at http://localhost:${port}/api-docs`);
 });
-app.post("/api/ai", authMiddleware, queryBooksWithAI);
-
+app.post("/api/ai", queryBooksWithAI);

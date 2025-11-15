@@ -598,7 +598,7 @@ async function GetBooks(req, res) {
 
     const schema = Joi.object({
       page: Joi.number().integer().min(1).default(1),
-      limit: Joi.number().integer().min(2).max(100).default(4),
+      limit: Joi.number().integer().min(2).max(100),
       sort: Joi.string()
         .valid("Title", "Price", "Stock", "createdAt")
         .default("createdAt"),
@@ -608,10 +608,10 @@ async function GetBooks(req, res) {
       priceMin: Joi.number().min(0),
       priceMax: Joi.number().min(0),
       inStock: Joi.boolean(),
-      withReviews: Joi.boolean().default(false),
-      reviewLimit: Joi.number().integer().min(1).max(50).default(3),
-      withStats: Joi.boolean().default(false),
-      withLastReview: Joi.boolean().default(true),
+      withReviews: Joi.boolean(),
+      reviewLimit: Joi.number().integer().min(1).max(50),
+      withStats: Joi.boolean(),
+      withLastReview: Joi.boolean(),
     }).unknown(false);
 
     const { error, value } = schema.validate(req.query, {
@@ -976,14 +976,11 @@ async function getAllBooksAdmin(req, res) {
       message: "All books retrieved successfully",
       books,
     });
-
   } catch (error) {
     console.error("getAllBooksAdmin:", error);
     return res.status(500).json({ message: error.message });
   }
 }
-
-
 
 module.exports = {
   AddBook,
