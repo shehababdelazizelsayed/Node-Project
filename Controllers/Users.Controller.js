@@ -677,6 +677,81 @@ const ChangeUserRole = async (req, res) => {
   }
 };
 
+/**
+ * @swagger
+ * /api/Users/my-books:
+ *   get:
+ *     summary: Get books purchased by the user
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User's books retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Book'
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
+ */
+const getUserBooks = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    // Import the necessary models
+    const Order = require("../models/Order");
+    const Book = require("../models/Book");
+
+    // Get all orders for this user
+    const orders = await Order.find({ User: userId }).populate({
+      path: "Books.BookId",
+      model: "Book",
+    });
+
+    // Extract unique books from orders
+    const bookSet = new Set();
+    const books = [];
+
+    for (const order of orders) {
+      if (order.Books && Array.isArray(order.Books)) {
+        for (const item of order.Books) {
+          if (item.BookId && !bookSet.has(item.BookId._id.toString())) {
+            bookSet.add(item.BookId._id.toString());
+            books.push({
+              _id: item.BookId._id,
+              Title: item.BookId.Title,
+              Author: item.BookId.Author,
+              Description: item.BookId.Description,
+              Price: item.BookId.Price,
+              Category: item.BookId.Category,
+              Image: item.BookId.Image,
+              Pdf: item.BookId.Pdf,
+            });
+          }
+        }
+      }
+    }
+
+    res.status(200).json({
+      message: "User's books retrieved successfully",
+      books: books,
+      count: books.length,
+    });
+  } catch (error) {
+    console.error("getUserBooks error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   UserLogin,
   UserRegister,
@@ -685,4 +760,5 @@ module.exports = {
   ForgotPassword,
   ResetPassword,
   ChangeUserRole,
+  getUserBooks,
 };

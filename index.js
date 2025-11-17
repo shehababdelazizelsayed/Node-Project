@@ -61,6 +61,7 @@ const {
   ForgotPassword,
   ResetPassword,
   ChangeUserRole,
+  getUserBooks,
 } = require("./Controllers/Users.Controller");
 const {
   AddBook,
@@ -128,6 +129,7 @@ app.post("/api/Users/forgot-password", ForgotPassword);
 app.post("/api/Users/reset-password/:token", ResetPassword);
 
 app.patch("/api/Users/Profile", authMiddleware, UserUpdate);
+app.get("/api/Users/my-books", authMiddleware, getUserBooks);
 
 // Books Routes
 app.get("/api/Books", GetBooks);
