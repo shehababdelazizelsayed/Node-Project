@@ -15,15 +15,21 @@ const server = http.createServer(app);
 const cors = require("cors");
 
 // Configure CORS
+// Allowlist origins (can be a comma-separated list in .env ALLOWED_ORIGIN)
+const allowedOrigins = process.env.ALLOWED_ORIGIN
+  ? process.env.ALLOWED_ORIGIN.split(",").map((o) => o.trim())
+  : ["http://localhost:4200", "http://localhost:3000", "http://127.0.0.1:4200"];
+
 const corsOptions = {
-  origin:
-    process.env.NODE_ENV === "production"
-      ? process.env.ALLOWED_ORIGIN
-      : [
-          "http://localhost:4200",
-          "http://localhost:3000",
-          "http://127.0.0.1:4200",
-        ],
+  origin: function (origin, callback) {
+    // allow requests with no origin like mobile apps or curl
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      return callback(null, true);
+    }
+    // not allowed
+    return callback(new Error("Not allowed by CORS"), false);
+  },
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   credentials: true,
   optionsSuccessStatus: 200,
@@ -37,6 +43,25 @@ try {
   console.error("Websocket failed cause", err);
   process.exit(1);
 }
+
+// Handle preflight requests and Private Network Access (PNA)
+// Newer browsers send `Access-Control-Request-Private-Network` when a page on the public
+// internet attempts to access a more-private address (like loopback/local). The server
+// must reply to the preflight with `Access-Control-Allow-Private-Network: true`.
+app.use((req, res, next) => {
+  if (req.method === "OPTIONS") {
+    try {
+      if (req.headers["access-control-request-private-network"]) {
+        res.setHeader("Access-Control-Allow-Private-Network", "true");
+      }
+      // Let the CORS middleware handle the rest of the headers and end the response
+      return cors(corsOptions)(req, res, next);
+    } catch (err) {
+      return res.sendStatus(500);
+    }
+  }
+  return next();
+});
 
 app.use(cors(corsOptions));
 app.use(express.json());
@@ -61,7 +86,6 @@ const {
   ForgotPassword,
   ResetPassword,
   ChangeUserRole,
-  getUserBooks,
 } = require("./Controllers/Users.Controller");
 const {
   AddBook,
@@ -129,7 +153,6 @@ app.post("/api/Users/forgot-password", ForgotPassword);
 app.post("/api/Users/reset-password/:token", ResetPassword);
 
 app.patch("/api/Users/Profile", authMiddleware, UserUpdate);
-app.get("/api/Users/my-books", authMiddleware, getUserBooks);
 
 // Books Routes
 app.get("/api/Books", GetBooks);
