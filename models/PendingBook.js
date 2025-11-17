@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 const schema = mongoose.Schema;
 
-const bookSchema = new schema({
+const pendingBookSchema = new schema({
   Title: {
     type: String,
     required: true,
@@ -20,7 +20,6 @@ const bookSchema = new schema({
   },
   Stock: {
     type: Number,
-
     min: 0,
     default: 0,
   },
@@ -34,12 +33,6 @@ const bookSchema = new schema({
     type: String,
     required: true,
   },
-  Reviews: [
-    {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Review",
-    },
-  ],
   Owner: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
@@ -47,9 +40,24 @@ const bookSchema = new schema({
   },
   Status: {
     type: String,
-    enum: ["approved", "pending", "rejected"],
-    default: "approved",
+    enum: ["pending", "approved", "rejected"],
+    default: "pending",
+  },
+  AdminComment: {
+    type: String,
+    default: "",
+  },
+  SubmittedAt: {
+    type: Date,
+    default: Date.now,
+  },
+  ReviewedAt: {
+    type: Date,
+  },
+  ReviewedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
   }
 });
 
-module.exports = mongoose.model("Book", bookSchema);
+module.exports = mongoose.model("PendingBook", pendingBookSchema);

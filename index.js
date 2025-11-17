@@ -36,7 +36,9 @@ connectRedis();
 // Add logging middleware
 app.use(requestLogger);
 
+const pendingBooksRoute = require("./routes/pendingBooks.routes");
 const uploadRoute = require("./routes/uploadRoute");
+app.use("/api/pending-books", pendingBooksRoute);
 app.use("/api", uploadRoute);
 
 const upload = require("./Helpers/upload");
@@ -108,7 +110,7 @@ app.get("/api/Books/:id", GetBookById);
 app.post(
   "/api/Books",
   authMiddleware,
-  authorizeRoles("Owner", "Admin"),
+  authorizeRoles("User", "Owner", "Admin"),
   upload.fields([
     { name: "image", maxCount: 1 },
     { name: "pdf", maxCount: 1 },

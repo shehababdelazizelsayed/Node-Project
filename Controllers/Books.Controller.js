@@ -52,6 +52,7 @@
  *         Owner: userId
  */
 const Book = require("../models/Book");
+const PendingBook = require("../models/PendingBook");
 const Joi = require("joi");
 const cloudinary = require("../Helpers/cloudinary");
 const fs = require("fs");
@@ -197,43 +198,48 @@ async function AddBook(req, res) {
       }
     }
 
-    // if (!Title || !Author || !Price || !Description || !Category) {
-    //   return res.status(400).json({
-    //     message: "Title, Author, Price , Description , Category are required",
-    //   });
-    // }
+    // Check user role: if User, create PendingBook; if Admin/Owner, create Book directly
+    if (req.user.Role === "User") {
+      // Create PendingBook for user submission
+      const CreatePendingBook = await PendingBook.create({
+        Title,
+        Author,
+        Price,
+        Stock,
+        Category,
+        Description,
+        Image: imageUrl,
+        Pdf: pdfUrl,
+        Owner: req.user.userId,
+      });
 
-    // if (Number(Price) < 0) {
-    //   return res.status(400).json({
-    //     message: "Price must be >= 0"
-    //   });
-    // }
+      return res.status(201).json({
+        message: "Book submitted for approval successfully",
+        PendingBook: CreatePendingBook,
+      });
+    } else {
+      // Admin or Owner: create Book directly
+      const CreateBook = await Book.create({
+        Title,
+        Author,
+        Price,
+        Stock,
+        Category,
+        Description,
+        Image: imageUrl,
+        Pdf: pdfUrl,
+        Owner: req.user.userId,
+        Status: "approved",
+      });
 
-    // if (Number(Stock) < 0) {
-    //   return res.status(400).json({
-    //     message: "Stock must be >= 0"
-    //   });
-    // }
+      // Invalidate cache for books list
+      await deleteCache("books:*");
 
-    const CreateBook = await Book.create({
-      Title,
-      Author,
-      Price,
-      Stock,
-      Category,
-      Description,
-      Image: imageUrl,
-      Pdf: pdfUrl,
-      Owner: req.user.userId,
-    });
-
-    // Invalidate cache for books list
-    await deleteCache("books:*");
-
-    return res.status(201).json({
-      message: "Book created successfully",
-      Book: CreateBook,
-    });
+      return res.status(201).json({
+        message: "Book created successfully",
+        Book: CreateBook,
+      });
+    }
   } catch (error) {
     console.error("addBook:", error);
     return res.status(500).json({
