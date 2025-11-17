@@ -6,16 +6,25 @@ const userSockets = new Map();
 function init(server) {
   if (io) return io;
 
+  const corsOrigin =
+    process.env.NODE_ENV === "production"
+      ? process.env.ALLOWED_ORIGIN
+      : [
+          "http://localhost:4200",
+          "http://localhost:3000",
+          "http://127.0.0.1:4200",
+        ];
+
   io = new Server(server, {
     cors: {
-      origin:
-        process.env.NODE_ENV === "production"
-          ? process.env.ALLOWED_ORIGIN
-          : "*",
+      origin: corsOrigin,
       methods: ["GET", "POST"],
+      credentials: true,
+      allowEIO3: true,
     },
     pingTimeout: 60000,
     pingInterval: 25000,
+    transports: ["websocket", "polling"],
   });
 
   io.on("connection", (socket) => {

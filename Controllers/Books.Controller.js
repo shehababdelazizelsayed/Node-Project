@@ -52,6 +52,7 @@
  *         Owner: userId
  */
 const Book = require("../models/Book");
+const PendingBook = require("../models/PendingBook");
 const Joi = require("joi");
 const cloudinary = require("../Helpers/cloudinary");
 const fs = require("fs");
@@ -215,7 +216,8 @@ async function AddBook(req, res) {
     //   });
     // }
 
-    const CreateBook = await Book.create({
+    // Save to PendingBook instead of Book for user uploads
+    const CreateBook = await PendingBook.create({
       Title,
       Author,
       Price,
@@ -225,14 +227,16 @@ async function AddBook(req, res) {
       Image: imageUrl,
       Pdf: pdfUrl,
       Owner: req.user.userId,
+      Status: "pending",
     });
 
     // Invalidate cache for books list
     await deleteCache("books:*");
 
     return res.status(201).json({
-      message: "Book created successfully",
+      message: "Book uploaded successfully and is pending admin approval",
       Book: CreateBook,
+      status: "pending",
     });
   } catch (error) {
     console.error("addBook:", error);
@@ -982,6 +986,96 @@ async function getAllBooksAdmin(req, res) {
   }
 }
 
+// Get all hero books
+async function getHeroBooks(req, res) {
+  try {
+    const heroBooks = await Book.find({ isHeroBook: true }).lean();
+    return res.status(200).json({
+      message: "Hero books retrieved successfully",
+      books: heroBooks,
+    });
+  } catch (error) {
+    console.error("getHeroBooks:", error);
+    return res.status(500).json({ message: error.message });
+  }
+}
+
+// Update hero books (expects array of book IDs)
+async function updateHeroBooks(req, res) {
+  try {
+    const { bookIds } = req.body;
+    if (!Array.isArray(bookIds)) {
+      return res.status(400).json({ message: "bookIds must be an array" });
+    }
+    // Unset all current hero books
+    await Book.updateMany(
+      { isHeroBook: true },
+      { $set: { isHeroBook: false } }
+    );
+    // Set new hero books
+    await Book.updateMany(
+      { _id: { $in: bookIds } },
+      { $set: { isHeroBook: true } }
+    );
+    return res.status(200).json({ message: "Hero books updated successfully" });
+  } catch (error) {
+    console.error("updateHeroBooks:", error);
+    return res.status(500).json({ message: error.message });
+  }
+}
+
+// Get top 5 categories with most books
+async function getTopCategories(req, res) {
+  try {
+    const cacheKey = "top:categories";
+
+    // Check cache first
+    const cachedData = await getCache(cacheKey);
+    if (cachedData) {
+      console.log("Cache hit for top categories");
+      return res.status(200).json(cachedData);
+    }
+    console.log("Cache miss for top categories");
+
+    const topCategories = await Book.aggregate([
+      {
+        $group: {
+          _id: "$Category",
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $sort: { count: -1 },
+      },
+      {
+        $limit: 5,
+      },
+      {
+        $project: {
+          _id: 0,
+          name: "$_id",
+          count: 1,
+        },
+      },
+    ]);
+
+    const response = {
+      message: "Top categories retrieved successfully",
+      categories: topCategories,
+    };
+
+    // Cache the response
+    await setCache(cacheKey, response, 300); // TTL 5 minutes
+
+    return res.status(200).json(response);
+  } catch (error) {
+    console.error("getTopCategories:", error);
+    return res.status(500).json({
+      message: error.message,
+    });
+  }
+}
+
 module.exports = {
   AddBook,
   GetBooks,
@@ -989,4 +1083,7 @@ module.exports = {
   DeleteBook,
   GetBookById,
   getAllBooksAdmin,
+  getHeroBooks,
+  updateHeroBooks,
+  getTopCategories,
 };

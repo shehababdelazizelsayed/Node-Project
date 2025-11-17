@@ -30,6 +30,10 @@ const bookSchema = new schema({
   Pdf: {
     type: String,
   },
+  isHeroBook: {
+    type: Boolean,
+    default: false,
+  },
   Category: {
     type: String,
     required: true,
@@ -44,7 +48,7 @@ const bookSchema = new schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
     required: true,
-  }
+  },
 });
 
 module.exports = mongoose.model("Book", bookSchema);

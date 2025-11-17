@@ -13,6 +13,22 @@ const { requestLogger } = require("./utils/loggingMiddleware");
 
 const server = http.createServer(app);
 const cors = require("cors");
+
+// Configure CORS
+const corsOptions = {
+  origin:
+    process.env.NODE_ENV === "production"
+      ? process.env.ALLOWED_ORIGIN
+      : [
+          "http://localhost:4200",
+          "http://localhost:3000",
+          "http://127.0.0.1:4200",
+        ],
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  credentials: true,
+  optionsSuccessStatus: 200,
+};
+
 const SocketManager = require("./SocketManager");
 try {
   SocketManager.init(server);
@@ -21,13 +37,8 @@ try {
   console.error("Websocket failed cause", err);
   process.exit(1);
 }
-app.use(
-  cors({
-    origin: "*",
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    credentials: true,
-  })
-);
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Initialize Redis
@@ -58,6 +69,9 @@ const {
   DeleteBook,
   GetBookById,
   getAllBooksAdmin,
+  getHeroBooks,
+  updateHeroBooks,
+  getTopCategories,
 } = require("./Controllers/Books.Controller");
 const {
   AddToCart,
@@ -81,6 +95,19 @@ const {
   deleteUser,
   changeUserRole,
 } = require("./Controllers/AdminUsers.Controller");
+const {
+  getPendingBooks,
+  approvePendingBook,
+  rejectPendingBook,
+  getUserPendingBooks,
+} = require("./Controllers/PendingBooks.Controller");
+// const {
+//   getHeroSliderConfig,
+//   updateHeroSliderConfig,
+//   addBookToHeroSlider,
+//   removeBookFromHeroSlider,
+// } = require("./Controllers/HeroSlider.Controller");
+// const { getTopCategories } = require("./Controllers/Categories.Controller");
 
 mongoose
   .connect(process.env.Mongo_URL)
@@ -105,6 +132,7 @@ app.patch("/api/Users/Profile", authMiddleware, UserUpdate);
 // Books Routes
 app.get("/api/Books", GetBooks);
 app.get("/api/Books/:id", GetBookById);
+app.get("/api/categories/top", getTopCategories);
 app.post(
   "/api/Books",
   authMiddleware,
@@ -127,6 +155,61 @@ app.delete(
   authorizeRoles("Owner", "Admin"),
   DeleteBook
 );
+
+// Hero Books Routes (public GET, admin-only PUT)
+app.get("/api/hero-books", getHeroBooks);
+app.put(
+  "/api/hero-books",
+  authMiddleware,
+  authorizeRoles("Admin"),
+  updateHeroBooks
+);
+
+// Pending Books Routes (Admin only)
+app.get(
+  "/api/pending-books",
+  authMiddleware,
+  authorizeRoles("Admin"),
+  getPendingBooks
+);
+app.post(
+  "/api/pending-books/:id/approve",
+  authMiddleware,
+  authorizeRoles("Admin"),
+  approvePendingBook
+);
+app.post(
+  "/api/pending-books/:id/reject",
+  authMiddleware,
+  authorizeRoles("Admin"),
+  rejectPendingBook
+);
+app.get("/api/pending-books/user/:userId", authMiddleware, getUserPendingBooks);
+
+// Categories Routes
+// Categories Routes (disabled - controller missing)
+// app.get("/api/categories/top", getTopCategories);
+
+// Hero Slider Routes (disabled - using hero-books from Books.Controller instead)
+// app.get("/api/hero-slider", getHeroSliderConfig);
+// app.put(
+//   "/api/hero-slider",
+//   authMiddleware,
+//   authorizeRoles("Admin"),
+//   updateHeroSliderConfig
+// );
+// app.post(
+//   "/api/hero-slider/add-book",
+//   authMiddleware,
+//   authorizeRoles("Admin"),
+//   addBookToHeroSlider
+// );
+// app.post(
+//   "/api/hero-slider/remove-book",
+//   authMiddleware,
+//   authorizeRoles("Admin"),
+//   removeBookFromHeroSlider
+// );
 
 // Cart Routes
 app.post("/api/Cart", authMiddleware, AddToCart);
